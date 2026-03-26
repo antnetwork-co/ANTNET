@@ -28,13 +28,19 @@ export default function FollowUps() {
 
   async function fetchData() {
     setLoading(true)
-    const [{ data: network }, { data: outreach }] = await Promise.all([
-      supabase.from('network_contacts').select('*').not('last_spoken_to', 'is', null).order('last_spoken_to', { ascending: true }),
-      supabase.from('outreach_contacts').select('*').eq('responded', true).is('connected', null).order('created_at', { ascending: true })
-    ])
-    setNetworkFading((network || []).filter(c => daysSince(c.last_spoken_to) >= 30))
-    setOutreachPending(outreach || [])
-    setLoading(false)
+    try {
+      const [{ data: network }, { data: outreach }] = await Promise.all([
+        supabase.from('network_contacts').select('*').not('last_spoken_to', 'is', null).order('last_spoken_to', { ascending: true }),
+        supabase.from('outreach_contacts').select('*').eq('responded', true).is('connected', null).order('created_at', { ascending: true })
+      ])
+      setNetworkFading((network || []).filter(c => daysSince(c.last_spoken_to) >= 30))
+      setOutreachPending(outreach || [])
+    } catch {
+      setNetworkFading([])
+      setOutreachPending([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function markContacted(id) {

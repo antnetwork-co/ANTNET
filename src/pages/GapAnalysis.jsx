@@ -18,10 +18,10 @@ export default function GapAnalysis() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('network_contacts').select('skills_services, occupation').then(({ data }) => {
-      setContacts(data || [])
-      setLoading(false)
-    })
+    supabase.from('network_contacts').select('skills_services, occupation')
+      .then(({ data }) => setContacts(data || []))
+      .catch(() => setContacts([]))
+      .finally(() => setLoading(false))
   }, [])
 
   function getCount(keywords) {
