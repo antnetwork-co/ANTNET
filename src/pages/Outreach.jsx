@@ -60,7 +60,8 @@ export default function Outreach() {
       ...networkForm,
       user_id: userId,
       locations: networkForm.locations ? networkForm.locations.split(',').map(l => l.trim()) : [],
-      relationship_score: parseFloat(networkForm.relationship_score) || 5.0
+      relationship_score: parseFloat(networkForm.relationship_score) || 5.0,
+      last_spoken_to: networkForm.last_spoken_to || null
     }
     const { error } = await supabase.from('network_contacts').insert(payload)
     if (error) { alert('Save failed: ' + error.message); return }
