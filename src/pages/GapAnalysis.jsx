@@ -32,11 +32,13 @@ export default function GapAnalysis() {
   const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(true)
   const [aiLoading, setAiLoading] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => { fetchAndAnalyze() }, [])
 
   async function fetchAndAnalyze() {
     setLoading(true)
+    setError(false)
     try {
       const { data: contacts } = await supabase.from('network_contacts').select('name, occupation, skills_services')
       const contactList = contacts || []
@@ -60,6 +62,7 @@ export default function GapAnalysis() {
       }
     } catch {
       setGaps([])
+      setError(true)
     } finally {
       setLoading(false)
       setAiLoading(false)
@@ -109,6 +112,13 @@ export default function GapAnalysis() {
       <div style={{ padding:'24px 28px', flex:1 }}>
         {loading ? (
           <div style={{color:'#666',textAlign:'center',padding:'40px',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px'}}>Loading your network...</div>
+        ) : error ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">⚡</div>
+            <div className="empty-state-title">Connection timed out</div>
+            <div className="empty-state-sub">Supabase took too long to respond</div>
+            <button className="btn btn-gold" onClick={fetchAndAnalyze}>↺ Retry</button>
+          </div>
         ) : aiLoading ? (
           <div style={{textAlign:'center',padding:'40px'}}>
             <div style={{color:'#4a9eff',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px',marginBottom:'8px'}}>◆ AI analyzing your network gaps...</div>

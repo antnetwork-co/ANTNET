@@ -34,6 +34,7 @@ export default function Network() {
   const { profile, userId, openAI } = useOutletContext()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -53,12 +54,14 @@ export default function Network() {
 
   async function fetchContacts() {
     setLoading(true)
+    setError(false)
     try {
       const { data, error } = await supabase.from('network_contacts').select('*').order('created_at', { ascending: false })
       if (error) throw error
       setContacts(data || [])
     } catch {
       setContacts([])
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -175,6 +178,13 @@ export default function Network() {
         <div className="table-wrap">
           {loading ? (
             <div className="empty-state"><div style={{ color: '#666', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div></div>
+          ) : error ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">⚡</div>
+              <div className="empty-state-title">Connection timed out</div>
+              <div className="empty-state-sub">Supabase took too long to respond</div>
+              <button className="btn btn-gold" onClick={fetchContacts}>↺ Retry</button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">🕸️</div>

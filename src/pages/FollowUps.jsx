@@ -20,6 +20,7 @@ export default function FollowUps() {
   const [networkFading, setNetworkFading] = useState([])
   const [outreachPending, setOutreachPending] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [drafts, setDrafts] = useState({})
   const [drafting, setDrafting] = useState({})
   const [composeContact, setComposeContact] = useState(null)
@@ -28,6 +29,7 @@ export default function FollowUps() {
 
   async function fetchData() {
     setLoading(true)
+    setError(false)
     try {
       const [{ data: network }, { data: outreach }] = await Promise.all([
         supabase.from('network_contacts').select('*').not('last_spoken_to', 'is', null).order('last_spoken_to', { ascending: true }),
@@ -38,6 +40,7 @@ export default function FollowUps() {
     } catch {
       setNetworkFading([])
       setOutreachPending([])
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -94,6 +97,13 @@ export default function FollowUps() {
 
         {loading ? (
           <div style={{ color: '#666', textAlign: 'center', padding: '40px', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div>
+        ) : error ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">⚡</div>
+            <div className="empty-state-title">Connection timed out</div>
+            <div className="empty-state-sub">Supabase took too long to respond</div>
+            <button className="btn btn-gold" onClick={fetchData}>↺ Retry</button>
+          </div>
         ) : (
           <>
             {urgent.length > 0 && (

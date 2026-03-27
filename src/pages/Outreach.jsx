@@ -18,6 +18,7 @@ export default function Outreach() {
   const { profile, userId, openAI } = useOutletContext()
   const [contacts, setContacts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(null)
@@ -81,12 +82,14 @@ export default function Outreach() {
 
   async function fetchContacts() {
     setLoading(true)
+    setError(false)
     try {
       const { data, error } = await supabase.from('outreach_contacts').select('*').order('created_at', { ascending: false })
       if (error) throw error
       setContacts(data || [])
     } catch {
       setContacts([])
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -189,6 +192,13 @@ export default function Outreach() {
         <div className="table-wrap">
           {loading ? (
             <div className="empty-state"><div style={{ color: '#666', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div></div>
+          ) : error ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">⚡</div>
+              <div className="empty-state-title">Connection timed out</div>
+              <div className="empty-state-sub">Supabase took too long to respond</div>
+              <button className="btn btn-gold" onClick={fetchContacts}>↺ Retry</button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📡</div>
