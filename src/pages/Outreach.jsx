@@ -249,7 +249,7 @@ export default function Outreach() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{selected ? 'EDIT CONTACT' : 'ADD CONTACT'}</div>
@@ -326,7 +326,7 @@ export default function Outreach() {
       )}
 
       {showNetworkModal && (
-        <div className="modal-overlay" onClick={() => setShowNetworkModal(false)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">ADD TO MY NETWORK</div>

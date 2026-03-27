@@ -284,7 +284,7 @@ export default function Network() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ width: '560px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">{selected ? 'EDIT CONTACT' : 'ADD CONTACT'}</div>
