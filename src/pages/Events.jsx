@@ -270,8 +270,8 @@ export default function Events() {
                       ) : (
                         <span style={{ fontSize: '12px', color: '#3ecf6e', padding: '6px 0' }}>✓ Saved</span>
                       )}
-                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => window.open(googleCalendarUrl(event), '_blank')}>📅 Google</button>
-                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => openIcs(event)}>🍎 Apple</button>
+                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => window.open(googleCalendarUrl(event), '_blank')}>Google Cal</button>
+                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => openIcs(event)}>Apple Cal</button>
                     </div>
                   </div>
                 )
