@@ -134,6 +134,44 @@ ${outreachList || 'No outreach yet.'}`
   })
 }
 
+// Score and label events based on user's what_i_do and network gaps
+export async function scoreEvents({ events, whatIDo, gaps }) {
+  if (!events || events.length === 0) return []
+
+  const gapList = gaps && gaps.length > 0
+    ? gaps.filter(g => g.status === 'MISSING' || g.status === 'WEAK').map(g => g.category).join(', ')
+    : ''
+
+  const eventList = events.map((e, i) =>
+    `${i}: ${e.title} | ${e.location} | ${e.notes?.slice(0, 80) || ''}`
+  ).join('\n')
+
+  const system = `You are scoring events for relevance to a user's networking goals.
+User background: ${whatIDo || 'entrepreneur'}
+Network gaps (categories they're missing): ${gapList || 'unknown'}
+
+Score each event and give a short relevance label (max 6 words) explaining WHY it's relevant.
+Examples: "Fills your Designer gap", "Investor networking opportunity", "Matches your fitness goal", "Good for finding clients"
+
+Return JSON array only with index and label for events that are relevant (score >= 6):
+[{"index": 0, "label": "...", "score": 8}]
+
+Only include events with score 6 or higher. If no events qualify, return [].`
+
+  const text = await callClaude({
+    model: 'claude-haiku-4-5',
+    system,
+    messages: [{ role: 'user', content: `Events to score:\n${eventList}` }],
+    max_tokens: 600
+  })
+  try {
+    const match = text.match(/\[[\s\S]*\]/)
+    return match ? JSON.parse(match[0]) : []
+  } catch {
+    return []
+  }
+}
+
 // Generate Instagram search strategies to find similar people
 export async function findSimilar(description) {
   const system = `The user wants to find more people like this description: ${description}

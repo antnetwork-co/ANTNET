@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { scoreEvents } from '../lib/claude'
 
 const SOURCE_COLORS = {
   ticketmaster: '#4a9eff',
@@ -61,19 +62,33 @@ function downloadIcs(event) {
 }
 
 export default function Events() {
-  const { userId, openAI } = useOutletContext()
+  const { userId, openAI, profile } = useOutletContext()
   const [events, setEvents] = useState([])
+  const [eventLabels, setEventLabels] = useState({}) // id -> label string
   const [savedEvents, setSavedEvents] = useState([])
   const [contacts, setContacts] = useState([])
+  const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [selectedCity, setSelectedCity] = useState(CITIES[0])
   const [calendarYear] = useState(new Date().getFullYear())
   const [calendarMonth] = useState(new Date().getMonth())
 
+  // Sync city selector with profile city
+  useEffect(() => {
+    if (profile?.city) {
+      const match = CITIES.find(c => c.label === profile.city)
+      if (match) setSelectedCity(match)
+    }
+  }, [profile?.city])
+
   useEffect(() => {
     supabase.from('saved_events').select('*').order('event_date').then(({ data }) => setSavedEvents(data || []))
     supabase.from('network_contacts').select('id, name, locations').then(({ data }) => setContacts(data || []))
+    // Try to load cached gaps for event scoring context
+    supabase.from('gap_cache').select('gaps').eq('user_id', userId).maybeSingle().then(({ data }) => {
+      if (data?.gaps) setGaps(data.gaps)
+    }).catch(() => {})
   }, [])
 
   useEffect(() => { fetchEvents() }, [selectedCity])
@@ -81,11 +96,20 @@ export default function Events() {
   async function fetchEvents() {
     setLoading(true)
     setError(false)
+    setEventLabels({})
     try {
       const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${selectedCity.state}`)
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setEvents(data)
+      // Score events with AI in background
+      if (profile?.what_i_do && data.length > 0) {
+        scoreEvents({ events: data, whatIDo: profile.what_i_do, gaps }).then(scored => {
+          const labelMap = {}
+          scored.forEach(s => { if (data[s.index]) labelMap[data[s.index].id] = s.label })
+          setEventLabels(labelMap)
+        }).catch(() => {})
+      }
     } catch {
       setError(true)
       setEvents([])
@@ -172,6 +196,7 @@ export default function Events() {
                 const dt = formatEventDate(event.event_date)
                 const color = SOURCE_COLORS[event.source] || '#666'
                 const isSaved = savedEvents.some(s => s.title === event.title)
+                const aiLabel = eventLabels[event.id]
                 const matchedContacts = contacts.filter(c =>
                   (c.locations || []).some(loc =>
                     event.location?.toLowerCase().includes(loc.split(',')[0].toLowerCase())
@@ -183,6 +208,13 @@ export default function Events() {
                     <div className="event-source">
                       <div className="source-dot" style={{ background: color }} />
                       <span style={{ color, textTransform: 'uppercase', letterSpacing: '1.5px', fontFamily: "'JetBrains Mono',monospace", fontSize: '9px' }}>{event.source}</span>
+                      {aiLabel && (
+                        <span style={{
+                          marginLeft: '8px', background: 'rgba(245,200,66,0.12)', border: '1px solid rgba(245,200,66,0.3)',
+                          borderRadius: '20px', padding: '2px 8px', fontSize: '9px', color: '#F5C842',
+                          fontFamily: "'JetBrains Mono',monospace", letterSpacing: '0.5px'
+                        }}>◆ {aiLabel}</span>
+                      )}
                       <span style={{ color: '#666', marginLeft: 'auto', fontSize: '11px', fontFamily: "'JetBrains Mono',monospace" }}>{dt.full}</span>
                     </div>
 
