@@ -10,6 +10,11 @@ export default function Layout({ session, profile }) {
 
   useEffect(() => {
     fetchFollowUpCount()
+    // Refresh session every 4 minutes to prevent mid-query token expiry stalls
+    const keepalive = setInterval(() => {
+      supabase.auth.getSession()
+    }, 4 * 60 * 1000)
+    return () => clearInterval(keepalive)
   }, [])
 
   async function fetchFollowUpCount() {
