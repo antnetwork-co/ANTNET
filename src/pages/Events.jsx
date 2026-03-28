@@ -10,14 +10,10 @@ const SOURCE_COLORS = {
   manual: '#3ecf6e',
 }
 
-const CITIES = [
-  { label: 'Tampa, FL', city: 'Tampa', state: 'FL' },
-  { label: 'Miami, FL', city: 'Miami', state: 'FL' },
-  { label: 'Orlando, FL', city: 'Orlando', state: 'FL' },
-  { label: 'New York, NY', city: 'New York', state: 'NY' },
-  { label: 'Los Angeles, CA', city: 'Los Angeles', state: 'CA' },
-  { label: 'Austin, TX', city: 'Austin', state: 'TX' },
-]
+function parseCityState(input) {
+  const parts = input.split(',').map(s => s.trim())
+  return { city: parts[0] || 'Tampa', state: parts[1] || 'FL' }
+}
 
 function formatEventDate(dateStr) {
   if (!dateStr) return { day: '?', month: '?', time: '?', full: 'TBD' }
@@ -70,22 +66,23 @@ export default function Events() {
   const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-  const [selectedCity, setSelectedCity] = useState(CITIES[0])
+  const [cityInput, setCityInput] = useState(profile?.city || 'Tampa, FL')
+  const [selectedCity, setSelectedCity] = useState(parseCityState(profile?.city || 'Tampa, FL'))
   const [calendarYear] = useState(new Date().getFullYear())
   const [calendarMonth] = useState(new Date().getMonth())
 
-  // Sync city selector with profile city (only if they actually set one)
+  // Sync city with profile city (only if they actually set one)
   useEffect(() => {
     if (profile?.city) {
-      const match = CITIES.find(c => c.label === profile.city)
-      if (match) setSelectedCity(match)
-      // If their city isn't in the dropdown list, try matching by city name
-      else {
-        const partial = CITIES.find(c => profile.city.toLowerCase().includes(c.city.toLowerCase()))
-        if (partial) setSelectedCity(partial)
-      }
+      setCityInput(profile.city)
+      setSelectedCity(parseCityState(profile.city))
     }
   }, [profile?.city])
+
+  function applyCity(input) {
+    const parsed = parseCityState(input)
+    setSelectedCity(parsed)
+  }
 
   useEffect(() => {
     supabase.from('saved_events').select('*').order('event_date').then(({ data }) => setSavedEvents(data || []))
@@ -103,7 +100,7 @@ export default function Events() {
     setError(false)
     setEventLabels({})
     try {
-      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${selectedCity.state}`)
+      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}`)
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setEvents(data)
@@ -155,14 +152,21 @@ export default function Events() {
       <div className="topbar">
         <div className="page-title">EVENTS <span>& CALENDAR</span></div>
         <div className="topbar-actions">
-          <select
-            value={selectedCity.label}
-            onChange={e => setSelectedCity(CITIES.find(c => c.label === e.target.value))}
-            className="input"
-            style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', cursor: 'pointer' }}
-          >
-            {CITIES.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
-          </select>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <input
+              value={cityInput}
+              onChange={e => setCityInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && applyCity(cityInput)}
+              placeholder="City, ST"
+              className="input"
+              style={{ padding: '6px 12px', fontSize: '12px', width: '140px' }}
+            />
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '6px 12px', fontSize: '12px' }}
+              onClick={() => applyCity(cityInput)}
+            >Search</button>
+          </div>
           <button className="btn btn-ai" onClick={openAI}>◆ Find Events For Me</button>
         </div>
       </div>

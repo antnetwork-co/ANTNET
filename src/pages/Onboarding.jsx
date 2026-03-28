@@ -3,12 +3,6 @@ import { supabase } from '../lib/supabase'
 
 const EXAMPLES = ['Entrepreneur', 'Content Creator', 'Sales / Biz Dev', 'Real Estate', 'Student', 'Freelancer']
 
-const CITIES = [
-  'Tampa, FL', 'Miami, FL', 'Orlando, FL', 'New York, NY',
-  'Los Angeles, CA', 'Austin, TX', 'Chicago, IL', 'Atlanta, GA',
-  'Houston, TX', 'Phoenix, AZ', 'Las Vegas, NV', 'Denver, CO',
-]
-
 export default function Onboarding({ userId }) {
   const [value, setValue] = useState('')
   const [city, setCity] = useState('')
@@ -98,19 +92,17 @@ export default function Onboarding({ userId }) {
         <div style={{ fontSize: '11px', color: '#666', marginBottom: '10px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '.5px', textAlign: 'left' }}>
           used to find local events for you
         </div>
-        <select
+        <input
           value={city}
           onChange={e => setCity(e.target.value)}
+          placeholder="e.g. Tampa, FL or Austin, TX"
           style={{
             width: '100%', background: '#181818', border: '1px solid #2a2a2a',
-            borderRadius: '10px', padding: '14px 18px', color: city ? '#f0f0f0' : '#666',
+            borderRadius: '10px', padding: '14px 18px', color: '#f0f0f0',
             fontSize: '14px', fontFamily: "'DM Sans', sans-serif", outline: 'none',
-            marginBottom: '24px', boxSizing: 'border-box', cursor: 'pointer'
+            marginBottom: '24px', boxSizing: 'border-box'
           }}
-        >
-          <option value="">Select your city...</option>
-          {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        />
 
         {error && (
           <div style={{

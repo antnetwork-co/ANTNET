@@ -9,6 +9,7 @@ import FollowUps from './pages/FollowUps'
 import GapAnalysis from './pages/GapAnalysis'
 import Events from './pages/Events'
 import Upgrade from './pages/Upgrade'
+import Settings from './pages/Settings'
 import Layout from './components/Layout'
 import './styles/global.css'
 
@@ -78,6 +79,7 @@ function App() {
           <Route path="gaps" element={<GapAnalysis />} />
           <Route path="events" element={<Events />} />
           <Route path="upgrade" element={<Upgrade session={session} profile={profile} onPlanChange={() => loadProfile(session.user.id)} />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to={session ? '/outreach' : '/login'} replace />} />
       </Routes>

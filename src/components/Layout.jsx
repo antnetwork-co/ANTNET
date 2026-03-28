@@ -101,9 +101,9 @@ export default function Layout({ session, profile }) {
                 <span style={{ marginLeft: 'auto', background: '#F5C842', color: '#0a0a0a', fontSize: '9px', padding: '2px 6px', borderRadius: '10px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>FREE</span>
               )}
             </NavLink>
-            <div style={{ ...navStyle(false), cursor: 'default', color: '#444' }}>
+            <NavLink to="/settings" style={({ isActive }) => navStyle(isActive)}>
               <span>⚙️</span> Settings
-            </div>
+            </NavLink>
           </div>
         </nav>
 
