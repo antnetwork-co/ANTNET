@@ -42,44 +42,47 @@ export default function GapAnalysis() {
     setError(false)
     setFromCache(false)
     try {
-      const [{ data: contacts }, { data: profileData }] = await Promise.all([
-        supabase.from('network_contacts').select('name, occupation, skills_services'),
-        supabase.from('profiles').select('ai_gaps, ai_gaps_contacts_count, what_i_do').eq('id', userId).single()
-      ])
+      // Fetch contacts — this is the critical query, fail fast if it errors
+      const { data: contacts } = await supabase.from('network_contacts').select('name, occupation, skills_services')
       const contactList = contacts || []
+      setLoading(false)
 
-      // Use cache if contact count matches and not forcing refresh
-      if (
-        !forceRefresh &&
-        profileData?.ai_gaps &&
-        profileData.ai_gaps_contacts_count === contactList.length &&
-        contactList.length > 0
-      ) {
-        setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
-        setFromCache(true)
-        setLoading(false)
-        return
+      // Check cache separately — best-effort, don't let it block or crash
+      if (!forceRefresh) {
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('ai_gaps, ai_gaps_contacts_count')
+            .eq('id', userId)
+            .single()
+          if (
+            profileData?.ai_gaps &&
+            profileData.ai_gaps_contacts_count === contactList.length &&
+            contactList.length > 0
+          ) {
+            setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
+            setFromCache(true)
+            return
+          }
+        } catch {}
       }
 
       if (!profile?.what_i_do || contactList.length === 0) {
         setGaps(basicAnalysis(contactList))
-        setLoading(false)
         return
       }
 
-      setLoading(false)
       setAiLoading(true)
-
       const aiGaps = await analyzeGaps({ whatIDo: profile.what_i_do, contacts: contactList })
 
       if (aiGaps && aiGaps.length > 0) {
         const shaped = aiGaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING }))
         setGaps(shaped)
-        // Save to cache
-        await supabase.from('profiles').update({
+        // Save cache in background — don't await
+        supabase.from('profiles').update({
           ai_gaps: aiGaps,
           ai_gaps_contacts_count: contactList.length
-        }).eq('id', userId)
+        }).eq('id', userId).then(() => {}).catch(() => {})
       } else {
         setGaps(basicAnalysis(contactList))
       }

@@ -43,10 +43,15 @@ async function fetchTicketmaster(city, stateCode) {
 
 async function fetchEventbrite(city, stateCode) {
   const key = process.env.EVENTBRITE_API_KEY
-  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}&token=${key}`
+  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}`
 
-  const res = await fetch(url)
-  if (!res.ok) return []
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${key}` }
+  })
+  if (!res.ok) {
+    console.error('Eventbrite error:', res.status, await res.text().catch(() => ''))
+    return []
+  }
   const data = await res.json()
   const items = data.events || []
 
