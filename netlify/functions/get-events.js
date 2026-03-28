@@ -21,7 +21,7 @@ export default async function handler(req) {
 
 async function fetchTicketmaster(city, stateCode) {
   const key = process.env.TICKETMASTER_API_KEY
-  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&classificationName=networking,business,conference,seminar&size=10&sort=date,asc`
+  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=15&sort=date,asc`
 
   const res = await fetch(url)
   if (!res.ok) return []
@@ -36,30 +36,30 @@ async function fetchTicketmaster(city, stateCode) {
     event_date: e.dates?.start?.dateTime || e.dates?.start?.localDate,
     event_url: e.url,
     notes: e.info || e.pleaseNote || '',
-    price: e.priceRanges ? `$${e.priceRanges[0].min}` : null,
+    price: e.priceRanges ? `From $${e.priceRanges[0].min}` : null,
     image: e.images?.[0]?.url || null,
   }))
 }
 
 async function fetchEventbrite(city, stateCode) {
   const key = process.env.EVENTBRITE_API_KEY
-  const url = `https://www.eventbriteapi.com/v3/events/search/?location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=25mi&expand=venue,ticket_availability&sort_by=date&token=${key}`
+  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}&token=${key}`
 
   const res = await fetch(url)
   if (!res.ok) return []
   const data = await res.json()
   const items = data.events || []
 
-  return items.slice(0, 10).map(e => ({
+  return items.slice(0, 15).map(e => ({
     id: `eb-${e.id}`,
     title: e.name?.text || 'Untitled Event',
     source: 'eventbrite',
-    location: e.venue?.name || e.venue?.address?.city || city,
+    location: e.venue?.name || e.venue?.address?.localized_address_display || city,
     event_date: e.start?.utc,
     event_url: e.url,
     notes: e.description?.text?.slice(0, 120) || '',
     price: e.ticket_availability?.minimum_ticket_price
-      ? `$${(e.ticket_availability.minimum_ticket_price.major_value)}`
+      ? `From $${e.ticket_availability.minimum_ticket_price.major_value}`
       : 'Free',
     image: e.logo?.url || null,
   }))
