@@ -74,11 +74,16 @@ export default function Events() {
   const [calendarYear] = useState(new Date().getFullYear())
   const [calendarMonth] = useState(new Date().getMonth())
 
-  // Sync city selector with profile city
+  // Sync city selector with profile city (only if they actually set one)
   useEffect(() => {
     if (profile?.city) {
       const match = CITIES.find(c => c.label === profile.city)
       if (match) setSelectedCity(match)
+      // If their city isn't in the dropdown list, try matching by city name
+      else {
+        const partial = CITIES.find(c => profile.city.toLowerCase().includes(c.city.toLowerCase()))
+        if (partial) setSelectedCity(partial)
+      }
     }
   }, [profile?.city])
 

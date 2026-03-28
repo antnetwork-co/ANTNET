@@ -24,7 +24,7 @@ export default function Onboarding({ userId }) {
       const { error: upsertError } = await supabase.from('profiles').upsert({
         id: userId,
         what_i_do: value.trim(),
-        city: city.trim() || 'Tampa, FL',
+        city: city.trim() || null,
         onboarding_complete: true,
         updated_at: new Date().toISOString()
       })
