@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import CityInput from '../components/CityInput'
 
 export default function Settings() {
   const { profile, userId } = useOutletContext()
@@ -17,12 +18,11 @@ export default function Settings() {
     setSaved(false)
     setError('')
     try {
-      const { error: err } = await supabase.from('profiles').upsert({
-        id: userId,
+      const { error: err } = await supabase.from('profiles').update({
         what_i_do: whatIDo.trim() || profile?.what_i_do,
         city: city.trim() || null,
         updated_at: new Date().toISOString()
-      })
+      }).eq('id', userId)
       if (err) { setError(err.message); return }
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -69,11 +69,10 @@ export default function Settings() {
             <div style={{ fontSize: '11px', color: '#555', fontFamily: "'JetBrains Mono', monospace", marginBottom: '10px' }}>
               Used to pre-select your city on the Events page
             </div>
-            <input
+            <CityInput
               value={city}
-              onChange={e => setCity(e.target.value)}
+              onChange={setCity}
               placeholder="e.g. Tampa, FL or Austin, TX"
-              className="input"
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </div>

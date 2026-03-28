@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import CityInput from '../components/CityInput'
 
 const EXAMPLES = ['Entrepreneur', 'Content Creator', 'Sales / Biz Dev', 'Real Estate', 'Student', 'Freelancer']
 
@@ -92,9 +93,9 @@ export default function Onboarding({ userId }) {
         <div style={{ fontSize: '11px', color: '#666', marginBottom: '10px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '.5px', textAlign: 'left' }}>
           used to find local events for you
         </div>
-        <input
+        <CityInput
           value={city}
-          onChange={e => setCity(e.target.value)}
+          onChange={setCity}
           placeholder="e.g. Tampa, FL or Austin, TX"
           style={{
             width: '100%', background: '#181818', border: '1px solid #2a2a2a',

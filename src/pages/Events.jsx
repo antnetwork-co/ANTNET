@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { scoreEvents } from '../lib/claude'
+import CityInput from '../components/CityInput'
 
 const SOURCE_COLORS = {
   ticketmaster: '#4a9eff',
@@ -37,7 +38,7 @@ function googleCalendarUrl(event) {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title)}&dates=${fmt(start)}/${fmt(end)}&location=${encodeURIComponent(event.location || '')}&details=${encodeURIComponent(event.notes || '')}`
 }
 
-function downloadIcs(event) {
+function openIcs(event) {
   const start = new Date(event.event_date)
   const end = new Date(start.getTime() + 2 * 60 * 60 * 1000)
   const fmt = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
@@ -50,11 +51,11 @@ function downloadIcs(event) {
     `URL:${event.event_url || ''}`,
     'END:VEVENT', 'END:VCALENDAR'
   ].join('\r\n')
-  const blob = new Blob([ics], { type: 'text/calendar' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}.ics`
-  a.click()
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  // On macOS Safari: opens Calendar directly. On Chrome: triggers download, double-click opens Calendar.
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
 export default function Events() {
@@ -153,13 +154,11 @@ export default function Events() {
         <div className="page-title">EVENTS <span>& CALENDAR</span></div>
         <div className="topbar-actions">
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <input
+            <CityInput
               value={cityInput}
-              onChange={e => setCityInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && applyCity(cityInput)}
+              onChange={v => { setCityInput(v); if (v.includes(',')) applyCity(v) }}
               placeholder="City, ST"
-              className="input"
-              style={{ padding: '6px 12px', fontSize: '12px', width: '140px' }}
+              style={{ padding: '6px 12px', fontSize: '12px', width: '160px' }}
             />
             <button
               className="btn btn-ghost"
@@ -272,7 +271,7 @@ export default function Events() {
                         <span style={{ fontSize: '12px', color: '#3ecf6e', padding: '6px 0' }}>✓ Saved</span>
                       )}
                       <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => window.open(googleCalendarUrl(event), '_blank')}>📅 Google</button>
-                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => downloadIcs(event)}>🍎 Apple</button>
+                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => openIcs(event)}>🍎 Apple</button>
                     </div>
                   </div>
                 )
