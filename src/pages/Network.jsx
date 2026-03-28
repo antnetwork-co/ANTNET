@@ -138,7 +138,8 @@ export default function Network() {
       </div>
 
       <div className="content">
-        <div className="stats-row">
+        {loading && <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#666', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div></div>}
+        <div className="stats-row" style={{ visibility: loading ? 'hidden' : 'visible' }}>
           {[
             { label: 'Warm Contacts', value: contacts.length, sub: 'Direct reach today', color: 'gold' },
             { label: 'Fading', value: fading, sub: '90+ days no contact', color: 'red' },

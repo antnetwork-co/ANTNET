@@ -154,7 +154,8 @@ export default function Outreach() {
       </div>
 
       <div className="content">
-        <div className="stats-row">
+        {loading && <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#666', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div></div>}
+        <div className="stats-row" style={{ visibility: loading ? 'hidden' : 'visible' }}>
           {[
             { label: 'Total Outreach', value: total, sub: `${responded} responded`, color: 'gold' },
             { label: 'Response Rate', value: `${responseRate}%`, sub: `${responded} of ${total}`, color: 'green' },
