@@ -105,12 +105,24 @@ export default function Events() {
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setEvents(data)
-      // Score events with AI in background
+      // Score events with AI — check localStorage cache first (24h expiry)
       if (profile?.what_i_do && data.length > 0) {
+        const cacheKey = `event_scores:${selectedCity.city}:${profile.what_i_do}`
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          try {
+            const { labels, ts } = JSON.parse(cached)
+            if (Date.now() - ts < 24 * 60 * 60 * 1000) {
+              setEventLabels(labels)
+              return
+            }
+          } catch {}
+        }
         scoreEvents({ events: data, whatIDo: profile.what_i_do, gaps }).then(scored => {
           const labelMap = {}
           scored.forEach(s => { if (data[s.index]) labelMap[data[s.index].id] = s.label })
           setEventLabels(labelMap)
+          localStorage.setItem(cacheKey, JSON.stringify({ labels: labelMap, ts: Date.now() }))
         }).catch(() => {})
       }
     } catch {
