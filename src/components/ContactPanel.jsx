@@ -33,7 +33,7 @@ export default function ContactPanel({ contact, type, profile, onClose, onEdit }
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '16px', fontWeight: 700 }}>{name}</div>
             {contact.instagram_handle && (
-              <div style={{ fontSize: '12px', color: '#666', fontFamily: "'JetBrains Mono', monospace" }}>@{contact.instagram_handle}</div>
+              <a href={`https://instagram.com/${contact.instagram_handle.replace('@','')}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#666', fontFamily: "'JetBrains Mono', monospace", textDecoration: 'none' }}>@{contact.instagram_handle.replace('@','')}</a>
             )}
             {contact.occupation && (
               <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>{contact.occupation}</div>

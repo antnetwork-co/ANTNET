@@ -221,7 +221,9 @@ export default function Outreach() {
                         </div>
                         <div>
                           <div className="contact-name">{c.name || '—'}</div>
-                          <div className="contact-handle">{c.instagram_handle ? `@${c.instagram_handle}` : '—'}</div>
+                          {c.instagram_handle
+                            ? <a className="contact-handle" href={`https://instagram.com/${c.instagram_handle.replace('@','')}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ textDecoration: 'none' }}>@{c.instagram_handle.replace('@','')}</a>
+                            : <div className="contact-handle">—</div>}
                         </div>
                       </div>
                     </td>
