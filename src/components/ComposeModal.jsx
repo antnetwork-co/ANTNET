@@ -41,7 +41,8 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
         contact,
         lastMessage: contact.message_sent || contact.notes,
         platform: p,
-        whatIDo: profile?.what_i_do
+        whatIDo: profile?.what_i_do,
+        strategyCache: profile?.strategy_cache || null
       })
       setMessage(text)
       setDrafted(true)

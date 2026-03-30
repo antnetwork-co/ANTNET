@@ -22,20 +22,25 @@ async function callClaude({ model = 'claude-haiku-4-5', system, messages, max_to
 }
 
 // Draft a follow-up or opener message for a contact
-export async function draftMessage({ contact, lastMessage, platform, whatIDo }) {
+export async function draftMessage({ contact, lastMessage, platform, whatIDo, strategyCache }) {
   const isEmail = platform?.toLowerCase() === 'email'
+
+  const strategyContext = strategyCache
+    ? `\n\nOutreach strategy insights from past results (apply only what's relevant to this contact):\n${strategyCache}`
+    : ''
+
   const system = isEmail
     ? `You write professional but personable networking emails.
 Format: short subject line on the first line starting with "Subject:", then a blank line, then the email body.
 The email should have a natural greeting, 2-3 short paragraphs, and a clear call to action or sign-off.
 No em dashes. No "I hope this message finds you well." Sound like a real person, not a template.
-The user's background: ${whatIDo || 'entrepreneur'}`
+The user's background: ${whatIDo || 'entrepreneur'}${strategyContext}`
     : `You write short, casual, human-sounding messages for someone who networks authentically — not like a salesperson.
 No em dashes. No formal language. No "I hope this message finds you well."
 Match the tone of a real text between two people who know each other. Instagram DMs and iMessages have the same casual tone.
 The user's background: ${whatIDo || 'entrepreneur'}
 Write one short message (2-4 sentences max) as a follow-up or opener.
-Do not explain the message. Just write it.`
+Do not explain the message. Just write it.${strategyContext}`
 
   const userMsg = `Contact: ${contact.name || contact.instagram_handle}
 Occupation: ${contact.occupation || 'unknown'}
@@ -45,6 +50,37 @@ Follow-up note: ${contact.potential_followup || contact.follow_up_note || 'none'
 Days since last contact: ${contact.days_since || 'unknown'}`
 
   return callClaude({ model: 'claude-haiku-4-5', system, messages: [{ role: 'user', content: userMsg }] })
+}
+
+// Analyze outreach patterns and produce a cached strategy summary
+export async function analyzeOutreachStrategy({ outreachContacts, whatIDo }) {
+  const rows = outreachContacts.map(c =>
+    `- ${c.name || c.instagram_handle || 'Unknown'} | ${c.occupation || 'unknown'} | responded: ${c.responded ?? 'unknown'} | connected: ${c.connected ?? 'unknown'} | opportunity: ${c.opportunity ?? 'unknown'} | message: "${(c.message_sent || '').slice(0, 120)}"`
+  ).join('\n')
+
+  const system = `You are analyzing someone's outreach history to find what actually works.
+Their background: ${whatIDo || 'entrepreneur'}
+
+Your job: find patterns in who responded and who didn't, and why.
+Look at: occupation types, message tone/length, whether a mutual was referenced, platform used, any other signals.
+
+Write a concise strategy summary (8-12 bullet points max) in plain English. Each bullet should be a specific, actionable insight.
+Examples:
+- Fitness/wellness contacts responded at 80% — short casual openers worked best for this group
+- Traders had 0% response rate regardless of message style — deprioritize this segment
+- Mentioning a mutual connection in any occupation doubled response rates
+- Messages under 3 sentences outperformed longer ones across all groups
+- Real estate contacts responded better via email than DM
+
+Only include patterns backed by actual data in the contacts below. Do not invent patterns.
+If the dataset is too small to draw conclusions for a group, say so briefly.`
+
+  return callClaude({
+    model: 'claude-sonnet-4-6',
+    system,
+    messages: [{ role: 'user', content: `Outreach contacts:\n${rows}` }],
+    max_tokens: 800
+  })
 }
 
 // Summarize and classify sentiment of a received response

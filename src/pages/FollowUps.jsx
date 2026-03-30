@@ -48,7 +48,8 @@ export default function FollowUps() {
       const text = await draftMessage({
         contact,
         lastMessage: contact.notes,
-        whatIDo: profile?.what_i_do
+        whatIDo: profile?.what_i_do,
+        strategyCache: profile?.strategy_cache || null
       })
       setDrafts(d => ({ ...d, [contact.id]: text }))
     } catch {

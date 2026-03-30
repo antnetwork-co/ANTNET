@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { askNetwork } from '../lib/claude'
+import { askNetwork, analyzeOutreachStrategy } from '../lib/claude'
 import { getColor } from '../lib/utils'
 
 const ACTIONS = [
@@ -48,13 +48,18 @@ export default function AIModal({ profile, initialAction, onClose }) {
     } else if (action.key === 'strategy') {
       setView('result')
       setLoading(true)
-      const res = await askNetwork({
-        question: 'Analyze my outreach history. What contact types respond best? What patterns lead to connections vs. dead ends? Give me 3 specific actionable improvements.',
-        contacts,
+      const res = await analyzeOutreachStrategy({
         outreachContacts: outreach,
         whatIDo: profile?.what_i_do
       })
       setResult(res)
+      // Save to profile so draftMessage can use it
+      if (userId) {
+        await supabase.from('profiles').update({
+          strategy_cache: res,
+          strategy_cached_at: new Date().toISOString()
+        }).eq('id', userId)
+      }
       setLoading(false)
     } else {
       setView('ask')
@@ -256,20 +261,32 @@ export default function AIModal({ profile, initialAction, onClose }) {
             {loading ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 0' }}>
                 <div className="ai-dot" />
-                <span style={{ color: '#607090', fontSize: '13px', fontFamily: "'JetBrains Mono', monospace" }}>Claude is thinking...</span>
+                <span style={{ color: '#607090', fontSize: '13px', fontFamily: "'JetBrains Mono', monospace" }}>
+                  {activeAction?.key === 'strategy' ? 'Analyzing your outreach patterns...' : 'Claude is thinking...'}
+                </span>
               </div>
             ) : (
-              <div style={{
-                background: 'linear-gradient(135deg, #0a1628, #0d1f3c)',
-                border: '1px solid #1e3a5f', borderRadius: '10px', padding: '16px 18px',
-                fontSize: '13.5px', color: '#c8deff', lineHeight: 1.7,
-                whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto'
-              }}>
-                {result}
-              </div>
+              <>
+                {activeAction?.key === 'strategy' && (
+                  <div style={{ fontSize: '10px', color: '#3ecf6e', fontFamily: "'JetBrains Mono', monospace", marginBottom: '10px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                    ✓ Saved — drafts will now use these patterns automatically
+                  </div>
+                )}
+                <div style={{
+                  background: 'linear-gradient(135deg, #0a1628, #0d1f3c)',
+                  border: '1px solid #1e3a5f', borderRadius: '10px', padding: '16px 18px',
+                  fontSize: '13.5px', color: '#c8deff', lineHeight: 1.7,
+                  whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto'
+                }}>
+                  {result}
+                </div>
+              </>
             )}
             <div className="ai-modal-footer" style={{ padding: '14px 0 0', border: 'none' }}>
               <button className="btn btn-ghost" onClick={goBack}>← Back</button>
+              {activeAction?.key === 'strategy' && !loading && (
+                <button className="btn btn-ghost" onClick={() => handleAction(activeAction)}>↺ Re-analyze</button>
+              )}
             </div>
           </div>
         )}
