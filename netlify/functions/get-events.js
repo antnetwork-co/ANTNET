@@ -2,6 +2,14 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
 
+const CATEGORY_KEYWORDS = {
+  networking: 'networking',
+  fitness: 'fitness',
+  realestate: 'real estate',
+  tech: 'tech',
+  creative: 'creative',
+}
+
 export default async function handler(req) {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 })
 
@@ -11,31 +19,41 @@ export default async function handler(req) {
   const page = parseInt(url.searchParams.get('page') || '0')
   const whatIDo = url.searchParams.get('q') || ''
 
-  const category = deriveCategory(whatIDo)
+  const categories = deriveCategories(whatIDo) // up to 2
 
-  // Check cache first
-  const cached = await getCached(city, stateCode, category, page)
-  if (cached) {
-    return new Response(JSON.stringify(cached), {
+  // Check cache for all categories, collect misses
+  const cacheResults = await Promise.all(categories.map(cat => getCached(city, stateCode, cat, page)))
+  const allCached = cacheResults.every(r => r !== null)
+
+  if (allCached) {
+    const events = dedup(cacheResults.flat())
+    events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+    return new Response(JSON.stringify(events), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
     })
   }
 
-  const results = await Promise.allSettled([
+  // Fetch: Ticketmaster once + one Google query per category miss
+  const missingCategories = categories.filter((cat, i) => cacheResults[i] === null)
+  const [tmEvents, ...googleResults] = await Promise.all([
     fetchTicketmaster(city, stateCode, page),
-    fetchGoogleEvents(city, stateCode, page, whatIDo),
+    ...missingCategories.map(cat => fetchGoogleEvents(city, stateCode, page, CATEGORY_KEYWORDS[cat]))
   ])
 
-  const tmEvents = results[0].status === 'fulfilled' ? results[0].value : []
-  const googleEvents = results[1].status === 'fulfilled' ? results[1].value : []
-  const events = [...tmEvents, ...googleEvents]
-  events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+  // Cache each Google result separately (only if it returned results)
+  missingCategories.forEach((cat, i) => {
+    const googleEvents = googleResults[i] || []
+    if (googleEvents.length > 0) {
+      writeCache(city, stateCode, cat, page, googleEvents).catch(() => {})
+    }
+  })
 
-  // Only cache if both sources returned results — prevents locking in partial data
-  if (tmEvents.length > 0 && googleEvents.length > 0) {
-    writeCache(city, stateCode, category, page, events).catch(() => {})
-  }
+  // Merge: fresh Google results + any cached Google results + Ticketmaster
+  const freshGoogle = googleResults.flat()
+  const cachedGoogle = cacheResults.filter(r => r !== null).flat()
+  const events = dedup([...tmEvents, ...freshGoogle, ...cachedGoogle])
+  events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
   return new Response(JSON.stringify(events), {
     status: 200,
@@ -43,14 +61,33 @@ export default async function handler(req) {
   })
 }
 
-function deriveCategory(whatIDo) {
+// Returns up to 2 category keys derived from what_i_do
+function deriveCategories(whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
-  if (lower.includes('real estate')) return 'realestate'
-  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) return 'tech'
-  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) return 'creative'
-  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running')) return 'fitness'
-  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business') || lower.includes('network')) return 'networking'
-  return 'networking'
+  const cats = []
+
+  // Networking/entrepreneur always first for ANTNET's core use case
+  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business') ||
+      lower.includes('network') || lower.includes('connect') || lower.includes('sales')) {
+    cats.push('networking')
+  }
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running') || lower.includes('run')) cats.push('fitness')
+  if (lower.includes('real estate')) cats.push('realestate')
+  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) cats.push('tech')
+  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) cats.push('creative')
+
+  if (cats.length === 0) cats.push('networking')
+  return cats.slice(0, 2) // max 2 Google queries
+}
+
+function dedup(events) {
+  const seen = new Set()
+  return events.filter(e => {
+    const key = e.title?.toLowerCase().trim()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 async function getCached(city, stateCode, category, page) {
@@ -63,10 +100,9 @@ async function getCached(city, stateCode, category, page) {
     if (!res.ok) return null
     const rows = await res.json()
     if (!rows.length) return null
-    const row = rows[0]
-    const age = Date.now() - new Date(row.fetched_at).getTime()
+    const age = Date.now() - new Date(rows[0].fetched_at).getTime()
     if (age > CACHE_TTL_MS) return null
-    return row.events
+    return rows[0].events
   } catch {
     return null
   }
@@ -109,36 +145,28 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
   }))
 }
 
-function buildGoogleQuery(city, stateCode, whatIDo) {
-  const lower = (whatIDo || '').toLowerCase()
-  let keyword = 'networking'
-  if (lower.includes('real estate')) keyword = 'real estate'
-  else if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) keyword = 'tech'
-  else if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) keyword = 'creative'
-  else if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running')) keyword = 'fitness'
-  // entrepreneur/startup/business/network → 'networking' (default)
-  return `${keyword} events in ${city} ${stateCode}`
-}
-
-async function fetchGoogleEvents(city, stateCode, page = 0, whatIDo = '') {
+async function fetchGoogleEvents(city, stateCode, page = 0, keyword = 'networking') {
   const key = process.env.SERPAPI_KEY
-  const query = buildGoogleQuery(city, stateCode, whatIDo)
+  const query = `${keyword} events in ${city} ${stateCode}`
   const start = page * 10
   const url = `https://serpapi.com/search.json?engine=google_events&q=${encodeURIComponent(query)}&start=${start}&api_key=${key}`
 
   const res = await fetch(url)
   if (!res.ok) {
-    console.error(`SerpApi error ${res.status}:`, await res.text().catch(() => ''))
+    console.error(`SerpApi error ${res.status} for "${query}":`, await res.text().catch(() => ''))
     return []
   }
   const data = await res.json()
-  if (data.error) console.error('SerpApi response error:', data.error)
+  if (data.error) {
+    console.error(`SerpApi error for "${query}":`, data.error)
+    return []
+  }
   const items = data.events_results || []
 
   return items.map((e, i) => {
     const eventDate = parseGoogleEventDate(e.date?.start_date, e.date?.when)
     return {
-      id: `goog-${page}-${i}`,
+      id: `goog-${keyword}-${page}-${i}`,
       title: e.title,
       source: 'google',
       location: Array.isArray(e.address) ? e.address.join(', ') : (e.address || city),
