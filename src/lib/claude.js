@@ -172,20 +172,3 @@ Only include events with score 6 or higher. If no events qualify, return [].`
   }
 }
 
-// Generate Instagram search strategies to find similar people
-export async function findSimilar(description) {
-  const system = `The user wants to find more people like this description: ${description}
-Generate 5-8 specific Instagram search strategies:
-- Bio keywords to search
-- Hashtags where these people post
-- Account types or niches to look for
-- Cities to focus on if relevant
-Return as a clean bulleted list. Be specific, not generic.`
-
-  return callClaude({
-    model: 'claude-haiku-4-5',
-    system,
-    messages: [{ role: 'user', content: 'Generate search strategies.' }],
-    max_tokens: 400
-  })
-}

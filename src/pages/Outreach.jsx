@@ -3,13 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ContactPanel from '../components/ContactPanel'
 import ComposeModal from '../components/ComposeModal'
-
-const COLORS = ['#F5C842', '#E8472A', '#4a9eff', '#3ecf6e', '#c084fc', '#f97316']
-function getColor(str) {
-  let hash = 0
-  for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  return COLORS[Math.abs(hash) % COLORS.length]
-}
+import { getColor } from '../lib/utils'
 function initials(name, handle) {
   return (name || handle || '??').replace('@', '').slice(0, 2).toUpperCase()
 }
@@ -28,6 +22,7 @@ export default function Outreach() {
   const [form, setForm] = useState(defaultForm())
   const [showNetworkModal, setShowNetworkModal] = useState(false)
   const [networkForm, setNetworkForm] = useState(defaultNetworkForm())
+  const [saving, setSaving] = useState(false)
 
   function defaultNetworkForm() {
     return {
@@ -96,13 +91,21 @@ export default function Outreach() {
   }
 
   async function saveContact() {
+    if (saving) return
     if (!userId) { alert('Session error — please refresh and sign in again.'); return }
-    const payload = { ...form, user_id: userId, follower_count: form.follower_count ? parseInt(form.follower_count) : null }
-    const { error } = selected
-      ? await supabase.from('outreach_contacts').update(payload).eq('id', selected.id)
-      : await supabase.from('outreach_contacts').insert(payload)
-    if (error) { alert('Save failed: ' + error.message); return }
-    setShowModal(false); setSelected(null); setForm(defaultForm()); fetchContacts()
+    setSaving(true)
+    try {
+      const payload = { ...form, user_id: userId, follower_count: form.follower_count ? parseInt(form.follower_count) : null }
+      const { error } = selected
+        ? await supabase.from('outreach_contacts').update(payload).eq('id', selected.id)
+        : await supabase.from('outreach_contacts').insert(payload)
+      if (error) { alert('Save failed: ' + error.message); return }
+      setShowModal(false); setSelected(null); setForm(defaultForm()); fetchContacts()
+    } catch (e) {
+      alert('Save failed: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function deleteContact(id) {
@@ -153,7 +156,7 @@ export default function Outreach() {
         </div>
       </div>
 
-      <div className="content">
+      <div className="content" style={{ position: 'relative' }}>
         {loading && <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ color: '#666', fontFamily: "'JetBrains Mono',monospace", fontSize: '12px' }}>Loading...</div></div>}
         <div className="stats-row" style={{ visibility: loading ? 'hidden' : 'visible' }}>
           {[
@@ -304,7 +307,7 @@ export default function Outreach() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn btn-gold" onClick={saveContact}>{selected ? 'Save Changes' : 'Add Contact'}</button>
+              <button className="btn btn-gold" onClick={saveContact} disabled={saving}>{saving ? 'Saving...' : selected ? 'Save Changes' : 'Add Contact'}</button>
             </div>
           </div>
         </div>

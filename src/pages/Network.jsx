@@ -2,17 +2,7 @@ import { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ContactPanel from '../components/ContactPanel'
-
-const COLORS = ['#F5C842', '#E8472A', '#4a9eff', '#3ecf6e', '#c084fc', '#f97316']
-function getColor(str) {
-  let hash = 0
-  for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  return COLORS[Math.abs(hash) % COLORS.length]
-}
-function daysSince(dateStr) {
-  if (!dateStr) return null
-  return Math.floor((new Date() - new Date(dateStr)) / (1000 * 60 * 60 * 24))
-}
+import { getColor, daysSince } from '../lib/utils'
 
 const GAPS = [
   { key: 'legal', label: 'Legal / Attorney', icon: '⚖️', skills: ['legal', 'attorney', 'lawyer', 'law'], desc: 'Critical for contracts, IP, or incorporation.' },

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { draftMessage } from '../lib/claude'
 import { supabase } from '../lib/supabase'
+import { getColor } from '../lib/utils'
 
 const PLATFORMS = ['DM / Text', 'Email']
 
@@ -11,23 +12,42 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
   const [hasEmDash, setHasEmDash] = useState(false)
   const [drafted, setDrafted] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [draftCache, setDraftCache] = useState({})
+  const originalDraft = useRef('')
 
   useEffect(() => {
     generateDraft()
-  }, [platform])
+  }, [])
+
+  async function switchPlatform(p) {
+    setPlatform(p)
+    if (draftCache[p]) {
+      setMessage(draftCache[p])
+      checkEmDash(draftCache[p])
+      setDrafted(true)
+    } else {
+      await generateDraftFor(p)
+    }
+  }
 
   async function generateDraft() {
+    await generateDraftFor(platform)
+  }
+
+  async function generateDraftFor(p) {
     setLoading(true)
     try {
       const text = await draftMessage({
         contact,
         lastMessage: contact.message_sent || contact.notes,
-        platform,
+        platform: p,
         whatIDo: profile?.what_i_do
       })
       setMessage(text)
       setDrafted(true)
       checkEmDash(text)
+      setDraftCache(prev => ({ ...prev, [p]: text }))
+      if (!originalDraft.current) originalDraft.current = text
     } catch {
       setMessage('')
     }
@@ -65,7 +85,7 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
         platform: platform.toLowerCase(),
         sent_at: new Date().toISOString(),
         is_ai_drafted: drafted,
-        was_edited: message !== message
+        was_edited: drafted && message !== originalDraft.current
       })
       if (onSent) onSent()
     }
@@ -91,7 +111,7 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
               <button
                 key={p}
                 className={`platform-btn${platform === p ? ' sel' : ''}`}
-                onClick={() => setPlatform(p)}
+                onClick={() => switchPlatform(p)}
               >{p}</button>
             ))}
           </div>
@@ -110,7 +130,7 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
           ) : (
             <>
               {drafted && (
-                <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#4a9eff', fontFamily: "'JetBrains Mono', monospace', display: 'flex', alignItems: 'center', gap: '6px'" }}>
+                <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#4a9eff', fontFamily: "'JetBrains Mono', monospace" }}>
                   ◆ AI Draft — edit freely
                 </div>
               )}
@@ -151,11 +171,4 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
       )}
     </div>
   )
-}
-
-const COLORS = ['#F5C842', '#E8472A', '#4a9eff', '#3ecf6e', '#c084fc', '#f97316']
-function getColor(str) {
-  let hash = 0
-  for (let i = 0; i < (str || '').length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  return COLORS[Math.abs(hash) % COLORS.length]
 }
