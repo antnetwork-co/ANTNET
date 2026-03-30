@@ -1,3 +1,7 @@
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
+
 export default async function handler(req) {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 })
 
@@ -7,6 +11,17 @@ export default async function handler(req) {
   const page = parseInt(url.searchParams.get('page') || '0')
   const whatIDo = url.searchParams.get('q') || ''
 
+  const category = deriveCategory(whatIDo)
+
+  // Check cache first
+  const cached = await getCached(city, stateCode, category, page)
+  if (cached) {
+    return new Response(JSON.stringify(cached), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
+    })
+  }
+
   const results = await Promise.allSettled([
     fetchTicketmaster(city, stateCode, page),
     fetchGoogleEvents(city, stateCode, page, whatIDo),
@@ -15,9 +30,56 @@ export default async function handler(req) {
   const events = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
+  // Write to cache (fire and forget)
+  writeCache(city, stateCode, category, page, events).catch(() => {})
+
   return new Response(JSON.stringify(events), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
+  })
+}
+
+function deriveCategory(whatIDo) {
+  const lower = (whatIDo || '').toLowerCase()
+  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business')) return 'entrepreneur'
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) return 'fitness'
+  if (lower.includes('real estate')) return 'realestate'
+  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) return 'tech'
+  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) return 'creative'
+  if (lower.includes('network') || lower.includes('connect')) return 'networking'
+  return 'networking'
+}
+
+async function getCached(city, stateCode, category, page) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/event_cache?city=eq.${encodeURIComponent(city)}&state_code=eq.${encodeURIComponent(stateCode)}&category=eq.${encodeURIComponent(category)}&page=eq.${page}&select=events,fetched_at`,
+      { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+    )
+    if (!res.ok) return null
+    const rows = await res.json()
+    if (!rows.length) return null
+    const row = rows[0]
+    const age = Date.now() - new Date(row.fetched_at).getTime()
+    if (age > CACHE_TTL_MS) return null
+    return row.events
+  } catch {
+    return null
+  }
+}
+
+async function writeCache(city, stateCode, category, page, events) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return
+  await fetch(`${SUPABASE_URL}/rest/v1/event_cache`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify({ city, state_code: stateCode, category, page, events, fetched_at: new Date().toISOString() })
   })
 }
 
@@ -87,13 +149,10 @@ async function fetchGoogleEvents(city, stateCode, page = 0, whatIDo = '') {
 // SerpApi returns dates like "Mar 30, 2026, 7:00 – 9:00 PM" or "Mar 30, 7:00 PM"
 function parseGoogleEventDate(startDate, when) {
   const year = new Date().getFullYear()
-  // Try start_date first — it's cleaner (e.g. "Mar 30" or "Apr 2, 2026")
   const candidates = [startDate, when].filter(Boolean)
   for (const raw of candidates) {
     try {
-      // Strip time ranges: "7:00 – 9:00 PM" → "7:00 PM"
       let cleaned = raw.replace(/(\d{1,2}:\d{2})\s*[–\-]\s*\d{1,2}:\d{2}/g, '$1')
-      // Add year if missing
       if (!/\d{4}/.test(cleaned)) cleaned = `${cleaned} ${year}`
       const d = new Date(cleaned)
       if (!isNaN(d.getTime())) return d.toISOString()
