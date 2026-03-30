@@ -11,8 +11,8 @@ export default async function handler(req) {
   const page = parseInt(url.searchParams.get('page') || '0')
   const whatIDo = url.searchParams.get('q') || ''
 
-  const searchTerms = deriveSearchTerms(whatIDo) // e.g. ['entrepreneur startup', 'fitness run club']
-  const tmKeyword = searchTerms[0] // Ticketmaster keyword filter
+  const searchTerms = deriveSearchTerms(whatIDo)
+  const wantsEntertainment = wantsTicketmaster(whatIDo)
 
   // Check cache for each search term
   const cacheResults = await Promise.all(searchTerms.map(term => getCached(city, stateCode, term, page)))
@@ -27,12 +27,14 @@ export default async function handler(req) {
     })
   }
 
-  // Fetch Ticketmaster (with role keyword) + Google per missing term
+  // Ticketmaster only for users with music/sports interest — max 2 results
   const missingTerms = searchTerms.filter((term, i) => cacheResults[i] === null)
-  const [tmEvents, ...googleResults] = await Promise.all([
-    fetchTicketmaster(city, stateCode, page, tmKeyword),
+  const fetches = [
+    wantsEntertainment ? fetchTicketmaster(city, stateCode) : Promise.resolve([]),
     ...missingTerms.map(term => fetchGoogleEvents(city, stateCode, page, term))
-  ])
+  ]
+  const [tmRaw, ...googleResults] = await Promise.all(fetches)
+  const tmEvents = (tmRaw || []).slice(0, 2) // cap at 2 entertainment results
 
   // Cache each Google result by term (only if it returned something)
   missingTerms.forEach((term, i) => {
@@ -43,13 +45,22 @@ export default async function handler(req) {
   })
 
   const cachedGoogle = cacheResults.filter(r => r !== null).flat()
-  const events = dedup([...tmEvents, ...googleResults.flat(), ...cachedGoogle])
+  const events = dedup([...googleResults.flat(), ...cachedGoogle, ...tmEvents])
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
   return new Response(JSON.stringify(events), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
   })
+}
+
+// Only pull Ticketmaster if user has explicit music/sports interest
+function wantsTicketmaster(whatIDo) {
+  const lower = (whatIDo || '').toLowerCase()
+  return lower.includes('music') || lower.includes('concert') || lower.includes('sports') ||
+         lower.includes('sport') || lower.includes('nfl') || lower.includes('nba') ||
+         lower.includes('mlb') || lower.includes('mls') || lower.includes('hockey') ||
+         lower.includes('basketball') || lower.includes('baseball') || lower.includes('football')
 }
 
 /**
@@ -138,11 +149,10 @@ async function writeCache(city, stateCode, term, page, events) {
   })
 }
 
-async function fetchTicketmaster(city, stateCode, page = 0, keyword = '') {
+async function fetchTicketmaster(city, stateCode, page = 0) {
   const key = process.env.TICKETMASTER_API_KEY
   const startDateTime = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
-  // classificationName=Miscellaneous targets non-entertainment events (conferences, expos, meetups)
-  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=10&sort=date,asc&startDateTime=${startDateTime}&page=${page}&classificationName=Miscellaneous&keyword=${encodeURIComponent(keyword)}`
+  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=5&sort=date,asc&startDateTime=${startDateTime}&page=${page}`
 
   const res = await fetch(url)
   if (!res.ok) return []
