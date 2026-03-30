@@ -6,9 +6,9 @@ import CityInput from '../components/CityInput'
 
 const SOURCE_COLORS = {
   ticketmaster: '#4a9eff',
-  eventbrite: '#E8472A',
+  google: '#3ecf6e',
   posh: '#F5C842',
-  manual: '#3ecf6e',
+  manual: '#aaaaaa',
 }
 
 function parseCityState(input) {
