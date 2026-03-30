@@ -6,22 +6,10 @@ export default async function handler(req) {
   const stateCode = url.searchParams.get('state') || 'FL'
   const page = parseInt(url.searchParams.get('page') || '0')
 
-  const results = await Promise.allSettled([
-    fetchTicketmaster(city, stateCode, page),
-    fetchEventbrite(city, stateCode, page),
-  ])
-
-  const events = results.flatMap(r => r.status === 'fulfilled' ? (Array.isArray(r.value) ? r.value : []) : [])
+  const events = await fetchTicketmaster(city, stateCode, page)
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
-  const debug = results.map((r, i) => ({
-    source: i === 0 ? 'ticketmaster' : 'eventbrite',
-    status: r.status,
-    count: r.status === 'fulfilled' && Array.isArray(r.value) ? r.value.length : 0,
-    error: r.status === 'rejected' ? r.reason?.message : (r.status === 'fulfilled' && !Array.isArray(r.value) ? r.value : undefined)
-  }))
-
-  return new Response(JSON.stringify({ events, debug }), {
+  return new Response(JSON.stringify(events), {
     status: 200,
     headers: { 'Content-Type': 'application/json' }
   })
@@ -50,32 +38,3 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
   }))
 }
 
-async function fetchEventbrite(city, stateCode, page = 0) {
-  const key = process.env.EVENTBRITE_API_KEY
-  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}&page=${page + 1}`
-
-  const res = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${key}` }
-  })
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    console.error('Eventbrite error:', res.status, body)
-    return { _error: `${res.status}: ${body}` }
-  }
-  const data = await res.json()
-  const items = data.events || []
-
-  return items.slice(0, 15).map(e => ({
-    id: `eb-${e.id}`,
-    title: e.name?.text || 'Untitled Event',
-    source: 'eventbrite',
-    location: e.venue?.name || e.venue?.address?.localized_address_display || city,
-    event_date: e.start?.utc,
-    event_url: e.url,
-    notes: e.description?.text?.slice(0, 120) || '',
-    price: e.ticket_availability?.minimum_ticket_price
-      ? `From $${e.ticket_availability.minimum_ticket_price.major_value}`
-      : 'Free',
-    image: e.logo?.url || null,
-  }))
-}
