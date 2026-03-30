@@ -112,15 +112,12 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
 
 function buildGoogleQuery(city, stateCode, whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
-  const tags = []
-  if (lower.includes('entrepreneur') || lower.includes('business') || lower.includes('startup')) tags.push('entrepreneur business')
-  if (lower.includes('network') || lower.includes('connect')) tags.push('networking')
-  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) tags.push('fitness running')
-  if (lower.includes('real estate')) tags.push('real estate')
-  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) tags.push('tech')
-  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) tags.push('creative')
-  const prefix = tags.length > 0 ? tags.join(' ') : 'networking social'
-  return `${prefix} events in ${city} ${stateCode}`
+  let keyword = 'networking'
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) keyword = 'fitness'
+  else if (lower.includes('real estate')) keyword = 'real estate'
+  else if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) keyword = 'tech'
+  else if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) keyword = 'creative'
+  return `${keyword} events in ${city} ${stateCode}`
 }
 
 async function fetchGoogleEvents(city, stateCode, page = 0, whatIDo = '') {
