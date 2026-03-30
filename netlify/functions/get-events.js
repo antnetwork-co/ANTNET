@@ -11,10 +11,17 @@ export default async function handler(req) {
     fetchEventbrite(city, stateCode, page),
   ])
 
-  const events = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+  const events = results.flatMap(r => r.status === 'fulfilled' ? (Array.isArray(r.value) ? r.value : []) : [])
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
-  return new Response(JSON.stringify(events), {
+  const debug = results.map((r, i) => ({
+    source: i === 0 ? 'ticketmaster' : 'eventbrite',
+    status: r.status,
+    count: r.status === 'fulfilled' && Array.isArray(r.value) ? r.value.length : 0,
+    error: r.status === 'rejected' ? r.reason?.message : (r.status === 'fulfilled' && !Array.isArray(r.value) ? r.value : undefined)
+  }))
+
+  return new Response(JSON.stringify({ events, debug }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' }
   })
@@ -51,8 +58,9 @@ async function fetchEventbrite(city, stateCode, page = 0) {
     headers: { 'Authorization': `Bearer ${key}` }
   })
   if (!res.ok) {
-    console.error('Eventbrite error:', res.status, await res.text().catch(() => ''))
-    return []
+    const body = await res.text().catch(() => '')
+    console.error('Eventbrite error:', res.status, body)
+    return { _error: `${res.status}: ${body}` }
   }
   const data = await res.json()
   const items = data.events || []

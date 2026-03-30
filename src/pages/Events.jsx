@@ -106,7 +106,9 @@ export default function Events() {
     try {
       const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}&page=${page}`)
       if (!res.ok) throw new Error('Failed')
-      const data = await res.json()
+      const payload = await res.json()
+      const data = payload.events ?? payload
+      console.log('[Events debug]', payload.debug)
       setEvents(data)
       // Score events with AI — check localStorage cache first (24h expiry)
       if (profile?.what_i_do && data.length > 0) {
