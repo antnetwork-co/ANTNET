@@ -27,11 +27,15 @@ export default async function handler(req) {
     fetchGoogleEvents(city, stateCode, page, whatIDo),
   ])
 
-  const events = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+  const tmEvents = results[0].status === 'fulfilled' ? results[0].value : []
+  const googleEvents = results[1].status === 'fulfilled' ? results[1].value : []
+  const events = [...tmEvents, ...googleEvents]
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
-  // Write to cache (fire and forget)
-  writeCache(city, stateCode, category, page, events).catch(() => {})
+  // Only cache if both sources returned results — prevents locking in partial data
+  if (tmEvents.length > 0 && googleEvents.length > 0) {
+    writeCache(city, stateCode, category, page, events).catch(() => {})
+  }
 
   return new Response(JSON.stringify(events), {
     status: 200,
@@ -126,8 +130,12 @@ async function fetchGoogleEvents(city, stateCode, page = 0, whatIDo = '') {
   const url = `https://serpapi.com/search.json?engine=google_events&q=${encodeURIComponent(query)}&start=${start}&api_key=${key}`
 
   const res = await fetch(url)
-  if (!res.ok) return []
+  if (!res.ok) {
+    console.error(`SerpApi error ${res.status}:`, await res.text().catch(() => ''))
+    return []
+  }
   const data = await res.json()
+  if (data.error) console.error('SerpApi response error:', data.error)
   const items = data.events_results || []
 
   return items.map((e, i) => {
