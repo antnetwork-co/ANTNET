@@ -45,12 +45,11 @@ export default async function handler(req) {
 
 function deriveCategory(whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
-  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business')) return 'entrepreneur'
-  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) return 'fitness'
   if (lower.includes('real estate')) return 'realestate'
   if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) return 'tech'
   if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) return 'creative'
-  if (lower.includes('network') || lower.includes('connect')) return 'networking'
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running')) return 'fitness'
+  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business') || lower.includes('network')) return 'networking'
   return 'networking'
 }
 
@@ -113,10 +112,11 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
 function buildGoogleQuery(city, stateCode, whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
   let keyword = 'networking'
-  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) keyword = 'fitness'
-  else if (lower.includes('real estate')) keyword = 'real estate'
+  if (lower.includes('real estate')) keyword = 'real estate'
   else if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) keyword = 'tech'
   else if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) keyword = 'creative'
+  else if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running')) keyword = 'fitness'
+  // entrepreneur/startup/business/network → 'networking' (default)
   return `${keyword} events in ${city} ${stateCode}`
 }
 
