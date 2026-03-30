@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { draftMessage } from '../lib/claude'
 import { supabase } from '../lib/supabase'
 
-const PLATFORMS = ['Instagram', 'iMessage', 'Email']
+const PLATFORMS = ['DM / Text', 'Email']
 
 export default function ComposeModal({ contact, profile, onClose, onSent }) {
-  const [platform, setPlatform] = useState('Instagram')
+  const [platform, setPlatform] = useState('DM / Text')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasEmDash, setHasEmDash] = useState(false)
