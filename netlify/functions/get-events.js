@@ -1,5 +1,6 @@
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const CLAUDE_API_KEY = process.env.VITE_CLAUDE_API_KEY
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
 
 export default async function handler(req) {
@@ -11,42 +12,32 @@ export default async function handler(req) {
   const page = parseInt(url.searchParams.get('page') || '0')
   const whatIDo = url.searchParams.get('q') || ''
 
-  const searchTerms = deriveSearchTerms(whatIDo)
-  const wantsEntertainment = wantsTicketmaster(whatIDo)
+  const searchTerms = deriveSearchTerms(whatIDo) // e.g. ['startup networking', 'fitness running']
+  const cacheKey = searchTerms.join('+')
 
-  // Check cache for each search term
-  const cacheResults = await Promise.all(searchTerms.map(term => getCached(city, stateCode, term, page)))
-  const allCached = cacheResults.every(r => r !== null)
-
-  if (allCached) {
-    const events = dedup(cacheResults.flat())
-    events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
-    return new Response(JSON.stringify(events), {
+  // Check cache
+  const cached = await getCached(city, stateCode, cacheKey, page)
+  if (cached) {
+    return new Response(JSON.stringify(cached), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
     })
   }
 
-  // Ticketmaster only for users with music/sports interest — max 2 results
-  const missingTerms = searchTerms.filter((term, i) => cacheResults[i] === null)
-  const fetches = [
-    wantsEntertainment ? fetchTicketmaster(city, stateCode) : Promise.resolve([]),
-    ...missingTerms.map(term => fetchGoogleEvents(city, stateCode, page, term))
-  ]
-  const [tmRaw, ...googleResults] = await Promise.all(fetches)
-  const tmEvents = (tmRaw || []).slice(0, 2) // cap at 2 entertainment results
+  // Fetch: Claude web search (primary) + Ticketmaster (filler, capped)
+  const [claudeEvents, tmEvents] = await Promise.all([
+    fetchClaudeEvents(city, stateCode, searchTerms, page),
+    fetchTicketmaster(city, stateCode, page),
+  ])
 
-  // Cache each Google result by term (only if it returned something)
-  missingTerms.forEach((term, i) => {
-    const googleEvents = googleResults[i] || []
-    if (googleEvents.length > 0) {
-      writeCache(city, stateCode, term, page, googleEvents).catch(() => {})
-    }
-  })
-
-  const cachedGoogle = cacheResults.filter(r => r !== null).flat()
-  const events = dedup([...googleResults.flat(), ...cachedGoogle, ...tmEvents])
+  // Only include Ticketmaster results not already covered by Claude search
+  const tmFiller = tmEvents.slice(0, 3)
+  const events = dedup([...claudeEvents, ...tmFiller])
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
+
+  if (claudeEvents.length > 0) {
+    writeCache(city, stateCode, cacheKey, page, events).catch(() => {})
+  }
 
   return new Response(JSON.stringify(events), {
     status: 200,
@@ -54,57 +45,106 @@ export default async function handler(req) {
   })
 }
 
-// Only pull Ticketmaster if user has explicit music/sports interest
-function wantsTicketmaster(whatIDo) {
-  const lower = (whatIDo || '').toLowerCase()
-  return lower.includes('music') || lower.includes('concert') || lower.includes('sports') ||
-         lower.includes('sport') || lower.includes('nfl') || lower.includes('nba') ||
-         lower.includes('mlb') || lower.includes('mls') || lower.includes('hockey') ||
-         lower.includes('basketball') || lower.includes('baseball') || lower.includes('football')
-}
-
-/**
- * Derives up to 2 specific search terms from what_i_do.
- * Primary term = role/occupation. Secondary = side interest if different.
- * These are used as both Google queries and Ticketmaster keyword filters.
- */
 function deriveSearchTerms(whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
   const terms = []
 
-  // Primary: role/occupation — ordered by specificity
-  if (lower.includes('real estate') || lower.includes('realtor') || lower.includes('realty')) {
-    terms.push('real estate investor meetup')
-  } else if (lower.includes('developer') || lower.includes('software') || lower.includes('coder') || lower.includes('engineer') || lower.includes('programmer')) {
-    terms.push('hackathon tech meetup')
-  } else if (lower.includes('market') || lower.includes('content creator') || lower.includes('brand') || lower.includes('advertis')) {
-    terms.push('marketing meetup')
-  } else if (lower.includes('investor') || lower.includes('venture') || lower.includes('vc') || lower.includes('angel')) {
-    terms.push('investor venture capital event')
-  } else if (lower.includes('creative') || lower.includes('design') || lower.includes('artist') || lower.includes('photographer')) {
-    terms.push('creative design meetup')
-  } else if (lower.includes('sales') || lower.includes('biz dev') || lower.includes('business development')) {
-    terms.push('sales business networking event')
-  } else if (lower.includes('entrepreneur') || lower.includes('founder') || lower.includes('startup') || lower.includes('business owner')) {
-    terms.push('entrepreneur startup meetup')
-  } else if (lower.includes('network') || lower.includes('connect')) {
-    terms.push('professional networking event')
-  } else {
-    terms.push('professional networking event')
-  }
+  if (lower.includes('real estate') || lower.includes('realtor')) terms.push('real estate investing networking')
+  else if (lower.includes('developer') || lower.includes('software') || lower.includes('coder') || lower.includes('engineer')) terms.push('tech startup hackathon')
+  else if (lower.includes('market') || lower.includes('content creator') || lower.includes('brand')) terms.push('marketing business networking')
+  else if (lower.includes('entrepreneur') || lower.includes('founder') || lower.includes('startup') || lower.includes('business')) terms.push('entrepreneur startup networking')
+  else if (lower.includes('investor') || lower.includes('venture') || lower.includes('vc')) terms.push('startup investor networking')
+  else if (lower.includes('creative') || lower.includes('design') || lower.includes('artist')) terms.push('creative design networking')
+  else terms.push('professional networking')
 
-  // Secondary: side interest — only add if different from primary
-  if (terms.length < 2) {
-    if ((lower.includes('fitness') || lower.includes('gym') || lower.includes('running') || lower.includes('run')) && !terms[0].includes('fitness')) {
-      terms.push('fitness run club')
-    } else if (lower.includes('travel') && !terms[0].includes('travel')) {
-      terms.push('travel social event')
-    } else if (lower.includes('sport') || lower.includes('outdoor')) {
-      terms.push('outdoor sports event')
-    }
-  }
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running') || lower.includes('run')) terms.push('fitness running clubs')
+  else if (lower.includes('travel')) terms.push('social travel meetup')
 
   return terms.slice(0, 2)
+}
+
+/**
+ * Uses Claude's web search tool to find real local events.
+ * Claude searches Eventbrite, Meetup, Facebook Events, local sites —
+ * the same way it finds events when you ask in chat.
+ */
+async function fetchClaudeEvents(city, stateCode, searchTerms, page = 0) {
+  if (!CLAUDE_API_KEY) return []
+
+  const today = new Date().toISOString().split('T')[0]
+  const interests = searchTerms.join(' and ')
+  const offset = page * 10
+
+  const prompt = `Search for upcoming local events related to ${interests} in ${city}, ${stateCode}.
+Today is ${today}. Find events happening in the next 60 days.
+Search Eventbrite, Meetup, Facebook Events, and any local event websites.${offset > 0 ? ` Skip the first ${offset} results and return the next batch.` : ''}
+
+Return ONLY a raw JSON array with no other text, markdown, or explanation. Each object:
+{"title":"event name","event_date":"ISO 8601 datetime or date string","location":"venue name, address","event_url":"full URL or null","notes":"1-2 sentence description","price":"Free or price range or null"}
+
+Include only events with a known date. Return 8-12 events.`
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'web-search-2025-03-05',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (!res.ok) {
+      console.error('Claude events API error:', res.status, await res.text().catch(() => ''))
+      return []
+    }
+
+    const data = await res.json()
+    const textBlock = data.content?.find(b => b.type === 'text')
+    if (!textBlock?.text) return []
+
+    // Extract JSON array from response
+    const match = textBlock.text.match(/\[[\s\S]*\]/)
+    if (!match) {
+      console.error('Claude events: no JSON array in response:', textBlock.text.slice(0, 200))
+      return []
+    }
+
+    const raw = JSON.parse(match[0])
+    return raw
+      .filter(e => e.title && e.event_date)
+      .map((e, i) => ({
+        id: `claude-${searchTerms[0].replace(/\s+/g, '-')}-p${page}-${i}`,
+        title: e.title,
+        source: 'google', // display as green (web-sourced)
+        location: e.location || city,
+        event_date: normalizeDate(e.event_date),
+        event_url: e.event_url || null,
+        notes: e.notes || '',
+        price: e.price || null,
+        image: null,
+      }))
+      .filter(e => e.event_date) // drop events where date couldn't be parsed
+  } catch (err) {
+    console.error('Claude events fetch error:', err.message)
+    return []
+  }
+}
+
+function normalizeDate(raw) {
+  if (!raw) return null
+  try {
+    const d = new Date(raw)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  } catch {}
+  return null
 }
 
 function dedup(events) {
@@ -117,11 +157,11 @@ function dedup(events) {
   })
 }
 
-async function getCached(city, stateCode, term, page) {
+async function getCached(city, stateCode, cacheKey, page) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_cache?city=eq.${encodeURIComponent(city)}&state_code=eq.${encodeURIComponent(stateCode)}&category=eq.${encodeURIComponent(term)}&page=eq.${page}&select=events,fetched_at`,
+      `${SUPABASE_URL}/rest/v1/event_cache?city=eq.${encodeURIComponent(city)}&state_code=eq.${encodeURIComponent(stateCode)}&category=eq.${encodeURIComponent(cacheKey)}&page=eq.${page}&select=events,fetched_at`,
       { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
     )
     if (!res.ok) return null
@@ -135,7 +175,7 @@ async function getCached(city, stateCode, term, page) {
   }
 }
 
-async function writeCache(city, stateCode, term, page, events) {
+async function writeCache(city, stateCode, cacheKey, page, events) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return
   await fetch(`${SUPABASE_URL}/rest/v1/event_cache`, {
     method: 'POST',
@@ -145,7 +185,7 @@ async function writeCache(city, stateCode, term, page, events) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates',
     },
-    body: JSON.stringify({ city, state_code: stateCode, category: term, page, events, fetched_at: new Date().toISOString() })
+    body: JSON.stringify({ city, state_code: stateCode, category: cacheKey, page, events, fetched_at: new Date().toISOString() })
   })
 }
 
@@ -157,9 +197,7 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
   const res = await fetch(url)
   if (!res.ok) return []
   const data = await res.json()
-  const items = data._embedded?.events || []
-
-  return items.map(e => ({
+  return (data._embedded?.events || []).map(e => ({
     id: `tm-${e.id}`,
     title: e.name,
     source: 'ticketmaster',
@@ -170,48 +208,4 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
     price: e.priceRanges ? `From $${e.priceRanges[0].min}` : null,
     image: e.images?.[0]?.url || null,
   }))
-}
-
-async function fetchGoogleEvents(city, stateCode, page = 0, searchTerm = 'professional networking event') {
-  const key = process.env.SERPAPI_KEY
-  const query = `${searchTerm} in ${city} ${stateCode}`
-  const start = page * 10
-  const url = `https://serpapi.com/search.json?engine=google_events&q=${encodeURIComponent(query)}&start=${start}&api_key=${key}`
-
-  const res = await fetch(url)
-  if (!res.ok) {
-    console.error(`SerpApi error ${res.status} for "${query}":`, await res.text().catch(() => ''))
-    return []
-  }
-  const data = await res.json()
-  if (data.error) {
-    console.error(`SerpApi error for "${query}":`, data.error)
-    return []
-  }
-
-  return (data.events_results || []).map((e, i) => ({
-    id: `goog-${searchTerm.replace(/\s+/g, '-')}-${page}-${i}`,
-    title: e.title,
-    source: 'google',
-    location: Array.isArray(e.address) ? e.address.join(', ') : (e.address || city),
-    event_date: parseGoogleEventDate(e.date?.start_date, e.date?.when),
-    event_url: e.link || (e.ticket_info?.[0]?.link) || null,
-    notes: e.description || '',
-    price: e.ticket_info?.[0]?.info || null,
-    image: e.thumbnail || null,
-  }))
-}
-
-function parseGoogleEventDate(startDate, when) {
-  const year = new Date().getFullYear()
-  const candidates = [startDate, when].filter(Boolean)
-  for (const raw of candidates) {
-    try {
-      let cleaned = raw.replace(/(\d{1,2}:\d{2})\s*[–\-]\s*\d{1,2}:\d{2}/g, '$1')
-      if (!/\d{4}/.test(cleaned)) cleaned = `${cleaned} ${year}`
-      const d = new Date(cleaned)
-      if (!isNaN(d.getTime())) return d.toISOString()
-    } catch {}
-  }
-  return null
 }
