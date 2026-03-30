@@ -63,7 +63,6 @@ export default function Events() {
   const [events, setEvents] = useState([])
   const [eventLabels, setEventLabels] = useState({}) // id -> label string
   const [savedEvents, setSavedEvents] = useState([])
-  const [contacts, setContacts] = useState([])
   const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -92,7 +91,6 @@ export default function Events() {
 
   useEffect(() => {
     supabase.from('saved_events').select('*').order('event_date').then(({ data }) => setSavedEvents(data || []))
-    supabase.from('network_contacts').select('id, name, locations').then(({ data }) => setContacts(data || []))
   }, [])
 
   // Use a stable string key so object identity changes don't re-trigger
@@ -104,7 +102,8 @@ export default function Events() {
     setError(false)
     setEventLabels({})
     try {
-      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}&page=${page}`)
+      const q = profile?.what_i_do ? `&q=${encodeURIComponent(profile.what_i_do)}` : ''
+      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}&page=${page}${q}`)
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setEvents(data)
@@ -220,11 +219,6 @@ export default function Events() {
                 const color = SOURCE_COLORS[event.source] || '#666'
                 const isSaved = savedEvents.some(s => s.title === event.title)
                 const aiLabel = eventLabels[event.id]
-                const matchedContacts = contacts.filter(c =>
-                  (c.locations || []).some(loc =>
-                    event.location?.toLowerCase().includes(loc.split(',')[0].toLowerCase())
-                  )
-                ).slice(0, 4)
 
                 return (
                   <div key={event.id} className="event-card">
@@ -255,26 +249,6 @@ export default function Events() {
                       </div>
                     )}
 
-                    {matchedContacts.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', borderTop: '1px solid #2a2a2a', marginBottom: '12px' }}>
-                        <div style={{ fontSize: '10px', color: '#666', fontFamily: "'JetBrains Mono',monospace" }}>NETWORK MATCH</div>
-                        <div style={{ display: 'flex' }}>
-                          {matchedContacts.map((c, i) => (
-                            <div key={c.id} style={{
-                              width: '22px', height: '22px', borderRadius: '50%',
-                              background: ['#4a9eff', '#F5C842', '#3ecf6e', '#E8472A'][i % 4],
-                              border: '2px solid #111', display: 'flex', alignItems: 'center',
-                              justifyContent: 'center', fontSize: '9px', fontWeight: 700,
-                              color: '#0a0a0a', fontFamily: "'Bebas Neue',sans-serif",
-                              marginLeft: i > 0 ? '-6px' : 0
-                            }}>
-                              {(c.name || '??').slice(0, 2).toUpperCase()}
-                            </div>
-                          ))}
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#666' }}>{matchedContacts.map(c => c.name.split(' ')[0]).join(', ')}</span>
-                      </div>
-                    )}
 
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {event.event_url && event.event_url !== '#' && (

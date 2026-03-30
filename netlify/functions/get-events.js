@@ -5,10 +5,11 @@ export default async function handler(req) {
   const city = url.searchParams.get('city') || 'Tampa'
   const stateCode = url.searchParams.get('state') || 'FL'
   const page = parseInt(url.searchParams.get('page') || '0')
+  const whatIDo = url.searchParams.get('q') || ''
 
   const results = await Promise.allSettled([
     fetchTicketmaster(city, stateCode, page),
-    fetchGoogleEvents(city, stateCode, page),
+    fetchGoogleEvents(city, stateCode, page, whatIDo),
   ])
 
   const events = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
@@ -43,9 +44,22 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
   }))
 }
 
-async function fetchGoogleEvents(city, stateCode, page = 0) {
+function buildGoogleQuery(city, stateCode, whatIDo) {
+  const lower = (whatIDo || '').toLowerCase()
+  const tags = []
+  if (lower.includes('entrepreneur') || lower.includes('business') || lower.includes('startup')) tags.push('entrepreneur business')
+  if (lower.includes('network') || lower.includes('connect')) tags.push('networking')
+  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('run') || lower.includes('sport')) tags.push('fitness running')
+  if (lower.includes('real estate')) tags.push('real estate')
+  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) tags.push('tech')
+  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) tags.push('creative')
+  const prefix = tags.length > 0 ? tags.join(' ') : 'networking social'
+  return `${prefix} events in ${city} ${stateCode}`
+}
+
+async function fetchGoogleEvents(city, stateCode, page = 0, whatIDo = '') {
   const key = process.env.SERPAPI_KEY
-  const query = `Events in ${city} ${stateCode}`
+  const query = buildGoogleQuery(city, stateCode, whatIDo)
   const start = page * 10
   const url = `https://serpapi.com/search.json?engine=google_events&q=${encodeURIComponent(query)}&start=${start}&api_key=${key}`
 
@@ -70,17 +84,20 @@ async function fetchGoogleEvents(city, stateCode, page = 0) {
   })
 }
 
-// SerpApi returns dates like "Mar 30, 2026, 7:00 PM" or "Mar 30, 7:00 PM"
+// SerpApi returns dates like "Mar 30, 2026, 7:00 – 9:00 PM" or "Mar 30, 7:00 PM"
 function parseGoogleEventDate(startDate, when) {
-  if (!startDate && !when) return null
-  try {
-    const str = when || startDate
-    // If year is missing, append current year
-    const hasYear = /\d{4}/.test(str)
-    const withYear = hasYear ? str : `${str}, ${new Date().getFullYear()}`
-    const d = new Date(withYear)
-    return isNaN(d.getTime()) ? null : d.toISOString()
-  } catch {
-    return null
+  const year = new Date().getFullYear()
+  // Try start_date first — it's cleaner (e.g. "Mar 30" or "Apr 2, 2026")
+  const candidates = [startDate, when].filter(Boolean)
+  for (const raw of candidates) {
+    try {
+      // Strip time ranges: "7:00 – 9:00 PM" → "7:00 PM"
+      let cleaned = raw.replace(/(\d{1,2}:\d{2})\s*[–\-]\s*\d{1,2}:\d{2}/g, '$1')
+      // Add year if missing
+      if (!/\d{4}/.test(cleaned)) cleaned = `${cleaned} ${year}`
+      const d = new Date(cleaned)
+      if (!isNaN(d.getTime())) return d.toISOString()
+    } catch {}
   }
+  return null
 }
