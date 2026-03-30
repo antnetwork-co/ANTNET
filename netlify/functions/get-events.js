@@ -4,10 +4,11 @@ export default async function handler(req) {
   const url = new URL(req.url)
   const city = url.searchParams.get('city') || 'Tampa'
   const stateCode = url.searchParams.get('state') || 'FL'
+  const page = parseInt(url.searchParams.get('page') || '0')
 
   const results = await Promise.allSettled([
-    fetchTicketmaster(city, stateCode),
-    fetchEventbrite(city, stateCode),
+    fetchTicketmaster(city, stateCode, page),
+    fetchEventbrite(city, stateCode, page),
   ])
 
   const events = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
@@ -19,9 +20,10 @@ export default async function handler(req) {
   })
 }
 
-async function fetchTicketmaster(city, stateCode) {
+async function fetchTicketmaster(city, stateCode, page = 0) {
   const key = process.env.TICKETMASTER_API_KEY
-  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=15&sort=date,asc`
+  const startDateTime = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=15&sort=date,asc&startDateTime=${startDateTime}&page=${page}`
 
   const res = await fetch(url)
   if (!res.ok) return []
@@ -41,9 +43,9 @@ async function fetchTicketmaster(city, stateCode) {
   }))
 }
 
-async function fetchEventbrite(city, stateCode) {
+async function fetchEventbrite(city, stateCode, page = 0) {
   const key = process.env.EVENTBRITE_API_KEY
-  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}`
+  const url = `https://www.eventbriteapi.com/v3/events/search/?q=${encodeURIComponent(city)}&location.address=${encodeURIComponent(city + ', ' + stateCode)}&location.within=30mi&expand=venue,ticket_availability&sort_by=date&start_date.range_start=${new Date().toISOString()}&page=${page + 1}`
 
   const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${key}` }

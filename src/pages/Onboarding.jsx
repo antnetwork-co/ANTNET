@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import CityInput from '../components/CityInput'
 
 const EXAMPLES = ['Entrepreneur', 'Content Creator', 'Sales / Biz Dev', 'Real Estate', 'Student', 'Freelancer']
 
 export default function Onboarding({ userId }) {
   const [value, setValue] = useState('')
-  const [city, setCity] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -19,7 +17,6 @@ export default function Onboarding({ userId }) {
       const { error: upsertError } = await supabase.from('profiles').upsert({
         id: userId,
         what_i_do: value.trim(),
-        city: city.trim() || null,
         onboarding_complete: true,
         updated_at: new Date().toISOString()
       })
@@ -88,22 +85,6 @@ export default function Onboarding({ userId }) {
             </div>
           ))}
         </div>
-
-        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '6px', textAlign: 'left' }}>Your city</div>
-        <div style={{ fontSize: '11px', color: '#666', marginBottom: '10px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '.5px', textAlign: 'left' }}>
-          used to find local events for you
-        </div>
-        <CityInput
-          value={city}
-          onChange={setCity}
-          placeholder="e.g. Tampa, FL or Austin, TX"
-          style={{
-            width: '100%', background: '#181818', border: '1px solid #2a2a2a',
-            borderRadius: '10px', padding: '14px 18px', color: '#f0f0f0',
-            fontSize: '14px', fontFamily: "'DM Sans', sans-serif", outline: 'none',
-            marginBottom: '24px', boxSizing: 'border-box'
-          }}
-        />
 
         {error && (
           <div style={{

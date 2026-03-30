@@ -67,41 +67,44 @@ export default function Events() {
   const [gaps, setGaps] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+  const [page, setPage] = useState(0)
   const [cityInput, setCityInput] = useState(profile?.city || 'Tampa, FL')
   const [selectedCity, setSelectedCity] = useState(parseCityState(profile?.city || 'Tampa, FL'))
   const [calendarYear] = useState(new Date().getFullYear())
   const [calendarMonth] = useState(new Date().getMonth())
 
-  // Sync city with profile city (only if they actually set one)
+  // Sync city with profile — only update if value actually changed to prevent double-fetch
   useEffect(() => {
     if (profile?.city) {
+      const parsed = parseCityState(profile.city)
       setCityInput(profile.city)
-      setSelectedCity(parseCityState(profile.city))
+      setSelectedCity(prev =>
+        prev.city === parsed.city && prev.state === parsed.state ? prev : parsed
+      )
     }
   }, [profile?.city])
 
   function applyCity(input) {
     const parsed = parseCityState(input)
+    setPage(0)
     setSelectedCity(parsed)
   }
 
   useEffect(() => {
     supabase.from('saved_events').select('*').order('event_date').then(({ data }) => setSavedEvents(data || []))
     supabase.from('network_contacts').select('id, name, locations').then(({ data }) => setContacts(data || []))
-    // Try to load cached gaps for event scoring context
-    supabase.from('gap_cache').select('gaps').eq('user_id', userId).maybeSingle().then(({ data }) => {
-      if (data?.gaps) setGaps(data.gaps)
-    }).catch(() => {})
   }, [])
 
-  useEffect(() => { fetchEvents() }, [selectedCity])
+  // Use a stable string key so object identity changes don't re-trigger
+  const cityKey = `${selectedCity.city},${selectedCity.state}`
+  useEffect(() => { fetchEvents() }, [cityKey, page])
 
   async function fetchEvents() {
     setLoading(true)
     setError(false)
     setEventLabels({})
     try {
-      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}`)
+      const res = await fetch(`/.netlify/functions/get-events?city=${encodeURIComponent(selectedCity.city)}&state=${encodeURIComponent(selectedCity.state)}&page=${page}`)
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
       setEvents(data)
@@ -288,6 +291,19 @@ export default function Events() {
                   </div>
                 )
               })
+            )}
+
+            {!loading && !error && (
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', padding: '24px 0' }}>
+                {page > 0 && (
+                  <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '8px 20px' }} onClick={() => { setPage(p => p - 1); window.scrollTo(0, 0) }}>
+                    ← Prev
+                  </button>
+                )}
+                <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '8px 20px' }} onClick={() => { setPage(p => p + 1); window.scrollTo(0, 0) }}>
+                  Next Page →
+                </button>
+              </div>
             )}
           </div>
 
