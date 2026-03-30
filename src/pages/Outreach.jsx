@@ -28,36 +28,6 @@ export default function Outreach() {
   const [form, setForm] = useState(defaultForm())
   const [showNetworkModal, setShowNetworkModal] = useState(false)
   const [networkForm, setNetworkForm] = useState(defaultNetworkForm())
-  const [igLoading, setIgLoading] = useState(false)
-  const [igError, setIgError] = useState('')
-
-  async function lookupInstagram(handle, target) {
-    const h = (handle || '').replace('@', '').trim()
-    if (!h) return
-    setIgLoading(true)
-    setIgError('')
-    try {
-      const res = await fetch(`/.netlify/functions/instagram-lookup?handle=${encodeURIComponent(h)}`)
-      const data = await res.json()
-      if (!res.ok) { setIgError(data.error || 'Lookup failed'); return }
-      const current = target === 'network' ? networkForm : form
-      const setter = target === 'network' ? setNetworkForm : setForm
-      const updates = {}
-      if (data.name && !current.name) updates.name = data.name
-      if (data.occupation && !current.occupation) updates.occupation = data.occupation
-      if (data.followers != null) {
-        const count = data.followers >= 1000
-          ? `${(data.followers / 1000).toFixed(1)}K`
-          : String(data.followers)
-        if (!current.notes) updates.notes = `IG: ${count} followers`
-      }
-      setter(f => ({ ...f, ...updates }))
-    } catch {
-      setIgError('Lookup failed')
-    } finally {
-      setIgLoading(false)
-    }
-  }
 
   function defaultNetworkForm() {
     return {
@@ -289,15 +259,11 @@ export default function Outreach() {
               <button className="btn btn-ghost" style={{ padding: '4px 10px' }} onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div className="modal-body">
-              <div className="form-group" style={{ marginBottom: '12px' }}>
-                <label className="form-label">Instagram Handle</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input className="input" value={form.instagram_handle} onChange={e => { setForm({ ...form, instagram_handle: e.target.value }); setIgError('') }} placeholder="@handle" style={{ flex: 1 }} />
-                  <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap' }} onClick={() => lookupInstagram(form.instagram_handle, 'outreach')} disabled={igLoading || !form.instagram_handle.trim()}>{igLoading ? 'Looking up...' : '◆ Auto-fill'}</button>
-                </div>
-                {igError && <div style={{ fontSize: '11px', color: '#E8472A', marginTop: '4px' }}>{igError}</div>}
-              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Instagram Handle</label>
+                  <input className="input" value={form.instagram_handle} onChange={e => setForm({ ...form, instagram_handle: e.target.value })} placeholder="@handle" />
+                </div>
                 <div className="form-group">
                   <label className="form-label">Name</label>
                   <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
@@ -378,13 +344,9 @@ export default function Outreach() {
                   <label className="form-label">Name</label>
                   <input className="input" value={networkForm.name} onChange={e => setNetworkForm({ ...networkForm, name: e.target.value })} placeholder="Full name" />
                 </div>
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div className="form-group">
                   <label className="form-label">Instagram Handle</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input className="input" value={networkForm.instagram_handle} onChange={e => { setNetworkForm({ ...networkForm, instagram_handle: e.target.value }); setIgError('') }} placeholder="@handle" style={{ flex: 1 }} />
-                    <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap' }} onClick={() => lookupInstagram(networkForm.instagram_handle, 'network')} disabled={igLoading || !networkForm.instagram_handle.trim()}>{igLoading ? 'Looking up...' : '◆ Auto-fill'}</button>
-                  </div>
-                  {igError && <div style={{ fontSize: '11px', color: '#E8472A', marginTop: '4px' }}>{igError}</div>}
+                  <input className="input" value={networkForm.instagram_handle} onChange={e => setNetworkForm({ ...networkForm, instagram_handle: e.target.value })} placeholder="@handle" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Phone</label>

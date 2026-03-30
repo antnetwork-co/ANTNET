@@ -41,34 +41,6 @@ export default function Network() {
   const [panelContact, setPanelContact] = useState(null)
   const [form, setForm] = useState(defaultForm())
   const [sortAsc, setSortAsc] = useState(true)
-  const [igLoading, setIgLoading] = useState(false)
-  const [igError, setIgError] = useState('')
-
-  async function lookupInstagram() {
-    const handle = (form.instagram_handle || '').replace('@', '').trim()
-    if (!handle) return
-    setIgLoading(true)
-    setIgError('')
-    try {
-      const res = await fetch(`/.netlify/functions/instagram-lookup?handle=${encodeURIComponent(handle)}`)
-      const data = await res.json()
-      if (!res.ok) { setIgError(data.error || 'Lookup failed'); return }
-      const updates = {}
-      if (data.name && !form.name) updates.name = data.name
-      if (data.occupation && !form.occupation) updates.occupation = data.occupation
-      if (data.followers != null) {
-        const count = data.followers >= 1000
-          ? `${(data.followers / 1000).toFixed(1)}K`
-          : String(data.followers)
-        if (!form.notes) updates.notes = `IG: ${count} followers`
-      }
-      setForm(f => ({ ...f, ...updates }))
-    } catch {
-      setIgError('Lookup failed')
-    } finally {
-      setIgLoading(false)
-    }
-  }
 
   function defaultForm() {
     return {
@@ -320,28 +292,10 @@ export default function Network() {
               <button className="btn btn-ghost" style={{ padding: '4px 10px' }} onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div className="modal-body">
-              <div className="form-group" style={{ marginBottom: '12px' }}>
-                <label className="form-label">Instagram Handle</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    className="input"
-                    value={form.instagram_handle}
-                    onChange={e => { setForm({ ...form, instagram_handle: e.target.value }); setIgError('') }}
-                    placeholder="@handle"
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="btn btn-ghost"
-                    style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap' }}
-                    onClick={lookupInstagram}
-                    disabled={igLoading || !form.instagram_handle.trim()}
-                  >{igLoading ? 'Looking up...' : '◆ Auto-fill'}</button>
-                </div>
-                {igError && <div style={{ fontSize: '11px', color: '#E8472A', marginTop: '4px' }}>{igError}</div>}
-              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 {[
                   { key: 'name', label: 'Name', placeholder: 'Full name' },
+                  { key: 'instagram_handle', label: 'Instagram Handle', placeholder: '@handle' },
                   { key: 'phone', label: 'Phone', placeholder: '(555) 000-0000' },
                   { key: 'email', label: 'Email', placeholder: 'email@example.com' },
                   { key: 'occupation', label: 'Occupation', placeholder: 'What do they do?' },
