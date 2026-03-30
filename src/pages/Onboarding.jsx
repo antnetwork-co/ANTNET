@@ -148,7 +148,7 @@ export default function Onboarding({ userId }) {
             </div>
 
             <div style={{ fontSize: '22px', fontWeight: 600, marginBottom: '6px' }}>Your city</div>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '18px', fontFamily: "'JetBrains Mono', monospace', letterSpacing: '.5px' }}>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '18px', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '.5px' }}>
               type to search
             </div>
 
