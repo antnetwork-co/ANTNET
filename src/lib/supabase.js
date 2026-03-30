@@ -9,5 +9,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     lock: async (_name, _acquireTimeout, fn) => fn()
+  },
+  global: {
+    fetch: (url, options = {}) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 12000)
+      return fetch(url, { ...options, signal: controller.signal })
+        .finally(() => clearTimeout(timeout))
+    }
   }
 })

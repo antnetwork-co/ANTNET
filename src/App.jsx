@@ -16,6 +16,7 @@ import './styles/global.css'
 function App() {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,9 +38,14 @@ function App() {
   async function loadProfile(userId) {
     try {
       const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-      setProfile(data)
+      if (data) {
+        setProfile(data)
+        setProfileLoadFailed(false)
+      } else {
+        setProfileLoadFailed(true)
+      }
     } catch {
-      setProfile(null)
+      setProfileLoadFailed(true)
     }
   }
 
@@ -56,7 +62,8 @@ function App() {
   }
 
   const needsOnboarding = session && profile && !profile.onboarding_complete
-  const isNewUser = session && !profile
+  // Only treat as new user if profile genuinely doesn't exist — not if load failed
+  const isNewUser = session && !profile && !profileLoadFailed
 
   return (
     <BrowserRouter>
