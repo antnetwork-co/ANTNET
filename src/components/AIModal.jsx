@@ -10,9 +10,10 @@ const ACTIONS = [
   { key: 'events', icon: '🗓️', title: 'Find Events', desc: 'Get AI recommendations on what events to attend based on your gaps and goals.' },
 ]
 
-export default function AIModal({ profile, onClose }) {
-  const [view, setView] = useState('menu') // menu | ask | result
-  const [activeAction, setActiveAction] = useState(null)
+export default function AIModal({ profile, initialAction, onClose }) {
+  const startAction = initialAction ? ACTIONS.find(a => a.key === initialAction) : null
+  const [view, setView] = useState(startAction ? 'ask' : 'menu')
+  const [activeAction, setActiveAction] = useState(startAction)
   const [input, setInput] = useState('')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,17 +43,6 @@ export default function AIModal({ profile, onClose }) {
       setLoading(true)
       const res = await askNetwork({
         question: 'Analyze my outreach history. What contact types respond best? What patterns lead to connections vs. dead ends? Give me 3 specific actionable improvements.',
-        contacts,
-        outreachContacts: outreach,
-        whatIDo: profile?.what_i_do
-      })
-      setResult(res)
-      setLoading(false)
-    } else if (action.key === 'events') {
-      setView('result')
-      setLoading(true)
-      const res = await askNetwork({
-        question: 'Based on my network gaps and what I do, what specific types of events should I be attending? What should I look for on Eventbrite, Posh, or locally? Be specific — name event types, industries, and what I should hope to find at each.',
         contacts,
         outreachContacts: outreach,
         whatIDo: profile?.what_i_do

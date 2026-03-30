@@ -2,14 +2,6 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
 
-const CATEGORY_KEYWORDS = {
-  networking: 'networking',
-  fitness: 'fitness',
-  realestate: 'real estate',
-  tech: 'tech',
-  creative: 'creative',
-}
-
 export default async function handler(req) {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 })
 
@@ -19,10 +11,11 @@ export default async function handler(req) {
   const page = parseInt(url.searchParams.get('page') || '0')
   const whatIDo = url.searchParams.get('q') || ''
 
-  const categories = deriveCategories(whatIDo) // up to 2
+  const searchTerms = deriveSearchTerms(whatIDo) // e.g. ['entrepreneur startup', 'fitness run club']
+  const tmKeyword = searchTerms[0] // Ticketmaster keyword filter
 
-  // Check cache for all categories, collect misses
-  const cacheResults = await Promise.all(categories.map(cat => getCached(city, stateCode, cat, page)))
+  // Check cache for each search term
+  const cacheResults = await Promise.all(searchTerms.map(term => getCached(city, stateCode, term, page)))
   const allCached = cacheResults.every(r => r !== null)
 
   if (allCached) {
@@ -34,25 +27,23 @@ export default async function handler(req) {
     })
   }
 
-  // Fetch: Ticketmaster once + one Google query per category miss
-  const missingCategories = categories.filter((cat, i) => cacheResults[i] === null)
+  // Fetch Ticketmaster (with role keyword) + Google per missing term
+  const missingTerms = searchTerms.filter((term, i) => cacheResults[i] === null)
   const [tmEvents, ...googleResults] = await Promise.all([
-    fetchTicketmaster(city, stateCode, page),
-    ...missingCategories.map(cat => fetchGoogleEvents(city, stateCode, page, CATEGORY_KEYWORDS[cat]))
+    fetchTicketmaster(city, stateCode, page, tmKeyword),
+    ...missingTerms.map(term => fetchGoogleEvents(city, stateCode, page, term))
   ])
 
-  // Cache each Google result separately (only if it returned results)
-  missingCategories.forEach((cat, i) => {
+  // Cache each Google result by term (only if it returned something)
+  missingTerms.forEach((term, i) => {
     const googleEvents = googleResults[i] || []
     if (googleEvents.length > 0) {
-      writeCache(city, stateCode, cat, page, googleEvents).catch(() => {})
+      writeCache(city, stateCode, term, page, googleEvents).catch(() => {})
     }
   })
 
-  // Merge: fresh Google results + any cached Google results + Ticketmaster
-  const freshGoogle = googleResults.flat()
   const cachedGoogle = cacheResults.filter(r => r !== null).flat()
-  const events = dedup([...tmEvents, ...freshGoogle, ...cachedGoogle])
+  const events = dedup([...tmEvents, ...googleResults.flat(), ...cachedGoogle])
   events.sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
 
   return new Response(JSON.stringify(events), {
@@ -61,40 +52,65 @@ export default async function handler(req) {
   })
 }
 
-// Returns up to 2 category keys derived from what_i_do
-function deriveCategories(whatIDo) {
+/**
+ * Derives up to 2 specific search terms from what_i_do.
+ * Primary term = role/occupation. Secondary = side interest if different.
+ * These are used as both Google queries and Ticketmaster keyword filters.
+ */
+function deriveSearchTerms(whatIDo) {
   const lower = (whatIDo || '').toLowerCase()
-  const cats = []
+  const terms = []
 
-  // Networking/entrepreneur always first for ANTNET's core use case
-  if (lower.includes('entrepreneur') || lower.includes('startup') || lower.includes('business') ||
-      lower.includes('network') || lower.includes('connect') || lower.includes('sales')) {
-    cats.push('networking')
+  // Primary: role/occupation — ordered by specificity
+  if (lower.includes('real estate') || lower.includes('realtor') || lower.includes('realty')) {
+    terms.push('real estate investor meetup')
+  } else if (lower.includes('developer') || lower.includes('software') || lower.includes('coder') || lower.includes('engineer') || lower.includes('programmer')) {
+    terms.push('hackathon tech meetup')
+  } else if (lower.includes('market') || lower.includes('content creator') || lower.includes('brand') || lower.includes('advertis')) {
+    terms.push('marketing meetup')
+  } else if (lower.includes('investor') || lower.includes('venture') || lower.includes('vc') || lower.includes('angel')) {
+    terms.push('investor venture capital event')
+  } else if (lower.includes('creative') || lower.includes('design') || lower.includes('artist') || lower.includes('photographer')) {
+    terms.push('creative design meetup')
+  } else if (lower.includes('sales') || lower.includes('biz dev') || lower.includes('business development')) {
+    terms.push('sales business networking event')
+  } else if (lower.includes('entrepreneur') || lower.includes('founder') || lower.includes('startup') || lower.includes('business owner')) {
+    terms.push('entrepreneur startup meetup')
+  } else if (lower.includes('network') || lower.includes('connect')) {
+    terms.push('professional networking event')
+  } else {
+    terms.push('professional networking event')
   }
-  if (lower.includes('fitness') || lower.includes('gym') || lower.includes('running') || lower.includes('run')) cats.push('fitness')
-  if (lower.includes('real estate')) cats.push('realestate')
-  if (lower.includes('tech') || lower.includes('developer') || lower.includes('software')) cats.push('tech')
-  if (lower.includes('creative') || lower.includes('design') || lower.includes('art')) cats.push('creative')
 
-  if (cats.length === 0) cats.push('networking')
-  return cats.slice(0, 2) // max 2 Google queries
+  // Secondary: side interest — only add if different from primary
+  if (terms.length < 2) {
+    if ((lower.includes('fitness') || lower.includes('gym') || lower.includes('running') || lower.includes('run')) && !terms[0].includes('fitness')) {
+      terms.push('fitness run club')
+    } else if (lower.includes('travel') && !terms[0].includes('travel')) {
+      terms.push('travel social event')
+    } else if (lower.includes('sport') || lower.includes('outdoor')) {
+      terms.push('outdoor sports event')
+    }
+  }
+
+  return terms.slice(0, 2)
 }
 
 function dedup(events) {
   const seen = new Set()
   return events.filter(e => {
-    const key = e.title?.toLowerCase().trim()
+    const key = (e.title || '').toLowerCase().trim()
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true
   })
 }
 
-async function getCached(city, stateCode, category, page) {
+async function getCached(city, stateCode, term, page) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/event_cache?city=eq.${encodeURIComponent(city)}&state_code=eq.${encodeURIComponent(stateCode)}&category=eq.${encodeURIComponent(category)}&page=eq.${page}&select=events,fetched_at`,
+      `${SUPABASE_URL}/rest/v1/event_cache?city=eq.${encodeURIComponent(city)}&state_code=eq.${encodeURIComponent(stateCode)}&category=eq.${encodeURIComponent(term)}&page=eq.${page}&select=events,fetched_at`,
       { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
     )
     if (!res.ok) return null
@@ -108,7 +124,7 @@ async function getCached(city, stateCode, category, page) {
   }
 }
 
-async function writeCache(city, stateCode, category, page, events) {
+async function writeCache(city, stateCode, term, page, events) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return
   await fetch(`${SUPABASE_URL}/rest/v1/event_cache`, {
     method: 'POST',
@@ -118,14 +134,15 @@ async function writeCache(city, stateCode, category, page, events) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates',
     },
-    body: JSON.stringify({ city, state_code: stateCode, category, page, events, fetched_at: new Date().toISOString() })
+    body: JSON.stringify({ city, state_code: stateCode, category: term, page, events, fetched_at: new Date().toISOString() })
   })
 }
 
-async function fetchTicketmaster(city, stateCode, page = 0) {
+async function fetchTicketmaster(city, stateCode, page = 0, keyword = '') {
   const key = process.env.TICKETMASTER_API_KEY
   const startDateTime = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
-  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=15&sort=date,asc&startDateTime=${startDateTime}&page=${page}`
+  // classificationName=Miscellaneous targets non-entertainment events (conferences, expos, meetups)
+  const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${key}&city=${encodeURIComponent(city)}&stateCode=${stateCode}&size=10&sort=date,asc&startDateTime=${startDateTime}&page=${page}&classificationName=Miscellaneous&keyword=${encodeURIComponent(keyword)}`
 
   const res = await fetch(url)
   if (!res.ok) return []
@@ -145,9 +162,9 @@ async function fetchTicketmaster(city, stateCode, page = 0) {
   }))
 }
 
-async function fetchGoogleEvents(city, stateCode, page = 0, keyword = 'networking') {
+async function fetchGoogleEvents(city, stateCode, page = 0, searchTerm = 'professional networking event') {
   const key = process.env.SERPAPI_KEY
-  const query = `${keyword} events in ${city} ${stateCode}`
+  const query = `${searchTerm} in ${city} ${stateCode}`
   const start = page * 10
   const url = `https://serpapi.com/search.json?engine=google_events&q=${encodeURIComponent(query)}&start=${start}&api_key=${key}`
 
@@ -161,25 +178,20 @@ async function fetchGoogleEvents(city, stateCode, page = 0, keyword = 'networkin
     console.error(`SerpApi error for "${query}":`, data.error)
     return []
   }
-  const items = data.events_results || []
 
-  return items.map((e, i) => {
-    const eventDate = parseGoogleEventDate(e.date?.start_date, e.date?.when)
-    return {
-      id: `goog-${keyword}-${page}-${i}`,
-      title: e.title,
-      source: 'google',
-      location: Array.isArray(e.address) ? e.address.join(', ') : (e.address || city),
-      event_date: eventDate,
-      event_url: e.link || (e.ticket_info?.[0]?.link) || null,
-      notes: e.description || '',
-      price: e.ticket_info?.[0]?.info || null,
-      image: e.thumbnail || null,
-    }
-  })
+  return (data.events_results || []).map((e, i) => ({
+    id: `goog-${searchTerm.replace(/\s+/g, '-')}-${page}-${i}`,
+    title: e.title,
+    source: 'google',
+    location: Array.isArray(e.address) ? e.address.join(', ') : (e.address || city),
+    event_date: parseGoogleEventDate(e.date?.start_date, e.date?.when),
+    event_url: e.link || (e.ticket_info?.[0]?.link) || null,
+    notes: e.description || '',
+    price: e.ticket_info?.[0]?.info || null,
+    image: e.thumbnail || null,
+  }))
 }
 
-// SerpApi returns dates like "Mar 30, 2026, 7:00 – 9:00 PM" or "Mar 30, 7:00 PM"
 function parseGoogleEventDate(startDate, when) {
   const year = new Date().getFullYear()
   const candidates = [startDate, when].filter(Boolean)

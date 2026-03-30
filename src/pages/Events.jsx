@@ -180,12 +180,12 @@ export default function Events() {
               onClick={() => applyCity(cityInput)}
             >Search</button>
           </div>
-          <button className="btn btn-ai" onClick={openAI}>◆ Find Events For Me</button>
+          <button className="btn btn-ai" onClick={() => openAI('events')}>◆ Find Events For Me</button>
         </div>
       </div>
 
       <div className="content">
-        <div className="ai-bar" onClick={openAI}>
+        <div className="ai-bar" onClick={() => openAI('events')}>
           <div className="ai-dot" />
           <div className="ai-text">
             <strong>AI Insight:</strong> Events can fill your network gaps. Ask AI to find Designers, Investors, or other missing contacts at local events.

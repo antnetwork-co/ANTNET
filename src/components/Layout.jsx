@@ -6,6 +6,7 @@ import AIModal from './AIModal'
 export default function Layout({ session, profile }) {
   const navigate = useNavigate()
   const [showAI, setShowAI] = useState(false)
+  const [aiInitialAction, setAIInitialAction] = useState(null)
   const [followUpCount, setFollowUpCount] = useState(0)
 
   useEffect(() => {
@@ -135,10 +136,10 @@ export default function Layout({ session, profile }) {
       </aside>
 
       <main style={{ marginLeft: '220px', flex: 1, minHeight: '100vh' }}>
-        <Outlet context={{ profile, userId: session?.user?.id, openAI: () => setShowAI(true) }} />
+        <Outlet context={{ profile, userId: session?.user?.id, openAI: (action) => { setAIInitialAction(action || null); setShowAI(true) } }} />
       </main>
 
-      {showAI && <AIModal profile={profile} onClose={() => setShowAI(false)} />}
+      {showAI && <AIModal profile={profile} initialAction={aiInitialAction} onClose={() => { setShowAI(false); setAIInitialAction(null) }} />}
     </div>
   )
 }
