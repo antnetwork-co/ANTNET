@@ -22,7 +22,7 @@ async function callClaude({ model = 'claude-haiku-4-5', system, messages, max_to
 }
 
 // Draft a follow-up or opener message for a contact
-export async function draftMessage({ contact, lastMessage, platform, whatIDo, strategyCache }) {
+export async function draftMessage({ contact, lastMessage, platform, whatIDo, strategyCache, customContext }) {
   const isEmail = platform?.toLowerCase() === 'email'
 
   const strategyContext = strategyCache
@@ -47,7 +47,7 @@ Occupation: ${contact.occupation || 'unknown'}
 Platform: ${platform || 'instagram'}
 Last message sent: ${lastMessage || 'none yet'}
 Follow-up note: ${contact.potential_followup || contact.follow_up_note || 'none'}
-Days since last contact: ${contact.days_since || 'unknown'}`
+Days since last contact: ${contact.days_since || 'unknown'}${customContext ? `\nNew context to work into the message: ${customContext}` : ''}`
 
   return callClaude({ model: 'claude-haiku-4-5', system, messages: [{ role: 'user', content: userMsg }] })
 }

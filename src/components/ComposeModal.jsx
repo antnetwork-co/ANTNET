@@ -5,25 +5,29 @@ import { getColor } from '../lib/utils'
 
 const PLATFORMS = ['DM / Text', 'Email']
 
+function stripEmDashes(text) {
+  return text.replace(/—/g, ',').replace(/ - /g, ', ')
+}
+
 export default function ComposeModal({ contact, profile, onClose, onSent }) {
   const [platform, setPlatform] = useState('DM / Text')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const [hasEmDash, setHasEmDash] = useState(false)
   const [drafted, setDrafted] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [draftCache, setDraftCache] = useState({})
+  const [customContext, setCustomContext] = useState('')
+  const [showContext, setShowContext] = useState(false)
   const originalDraft = useRef('')
 
   useEffect(() => {
-    generateDraft()
+    generateDraftFor(platform)
   }, [])
 
   async function switchPlatform(p) {
     setPlatform(p)
     if (draftCache[p]) {
       setMessage(draftCache[p])
-      checkEmDash(draftCache[p])
       setDrafted(true)
     } else {
       await generateDraftFor(p)
@@ -37,36 +41,23 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
   async function generateDraftFor(p) {
     setLoading(true)
     try {
-      const text = await draftMessage({
+      const raw = await draftMessage({
         contact,
         lastMessage: contact.message_sent || contact.notes,
         platform: p,
         whatIDo: profile?.what_i_do,
-        strategyCache: profile?.strategy_cache || null
+        strategyCache: profile?.strategy_cache || null,
+        customContext: customContext.trim() || null
       })
+      const text = stripEmDashes(raw)
       setMessage(text)
       setDrafted(true)
-      checkEmDash(text)
       setDraftCache(prev => ({ ...prev, [p]: text }))
       if (!originalDraft.current) originalDraft.current = text
     } catch {
       setMessage('')
     }
     setLoading(false)
-  }
-
-  function checkEmDash(text) {
-    setHasEmDash(/—| - /.test(text))
-  }
-
-  function fixEmDash() {
-    setMessage(m => m.replace(/—/g, ',').replace(/ - /g, ', '))
-    setHasEmDash(false)
-  }
-
-  function handleChange(e) {
-    setMessage(e.target.value)
-    checkEmDash(e.target.value)
   }
 
   async function handleCopySend() {
@@ -139,14 +130,31 @@ export default function ComposeModal({ contact, profile, onClose, onSent }) {
                 className="message-editor"
                 style={{ flex: 1 }}
                 value={message}
-                onChange={handleChange}
+                onChange={e => setMessage(e.target.value)}
                 placeholder="Write a message..."
                 autoFocus={!loading}
               />
-              <div className={`emdash-warning${hasEmDash ? ' visible' : ''}`}>
-                ⚠️ Em dash detected — sounds AI-written.
-                <span className="fix-btn" onClick={fixEmDash}>Fix it</span>
-              </div>
+              {showContext ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#666', fontFamily: "'JetBrains Mono', monospace" }}>
+                    New context for Claude
+                  </div>
+                  <textarea
+                    className="input"
+                    style={{ minHeight: '60px', resize: 'none', fontSize: '13px' }}
+                    placeholder="e.g. I just saw they launched a new product, mention that..."
+                    value={customContext}
+                    onChange={e => setCustomContext(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <button
+                  className="btn btn-ghost"
+                  style={{ alignSelf: 'flex-start', fontSize: '11px', padding: '5px 10px', color: '#666' }}
+                  onClick={() => setShowContext(true)}
+                >+ Add context</button>
+              )}
             </>
           )}
         </div>
