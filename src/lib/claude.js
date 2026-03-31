@@ -102,33 +102,37 @@ Return JSON only: {"summary": "...", "sentiment": "..."}`
   }
 }
 
-// Analyze network gaps
+// Analyze network gaps — fully dynamic based on what_i_do
 export async function analyzeGaps({ whatIDo, contacts }) {
   const contactList = contacts.map(c =>
     `- ${c.name || 'Unknown'}: ${c.occupation || ''} | ${c.skills_services || ''}`
   ).join('\n')
 
-  const system = `You are analyzing a person's professional network to find gaps.
+  const system = `You are a network strategy expert analyzing someone's professional network gaps.
 Their background: ${whatIDo}
 
-Their current contacts:
-${contactList}
+Your job:
+1. Based on their background, determine the 15-20 most important categories of people they should have in their network. Be specific to their field and goals — do NOT use a generic template.
+2. For each category, count how many of their current contacts match, and classify coverage:
+   - 0 contacts = MISSING
+   - 1 contact = WEAK
+   - 2-3 contacts = GROWING
+   - 4+ contacts = STRONG
+3. For each gap, write a 1-sentence reason explaining why that person type matters for their specific goals.
 
-For each category below, count how many contacts match and classify coverage:
-- 0 contacts = MISSING
-- 1 contact = WEAK
-- 2-3 contacts = GROWING
-- 4+ contacts = STRONG
+Examples of how to tailor categories:
+- Entrepreneur → Patent / IP Attorney, Business Mentor / Advisor, Angel Investor, Distributor / Supply Chain, PR Strategist, CPA / Tax Strategist, Brand Designer, Growth Marketer, Sales Lead Gen, Developer / Engineer, Operations / COO type, Exit / M&A Advisor, Recruiter / HR, Insurance Broker, Commercial Real Estate
+- Pre-med student → Research Mentor / Professor, Clinical Advisor / Physician, Pre-med Advisor, Hospital Administrator, MCAT Tutor / Academic Coach, Pharmacist, Nurse / NP, Medical School Alumni, Residency Coordinator, Healthcare Policy contact, Med school study group leads, Volunteer coordinator
+- Real estate investor → Title Company / Escrow, Real Estate Attorney, Hard Money Lender, Property Manager, General Contractor, Real Estate CPA, Insurance Broker, Commercial Broker, Market Data Analyst, Wholesaler, HOA Specialist
 
-Categories: Legal/Attorney, Designer/Creative, Investor/Capital, Developer/Engineer, Marketing/Growth, Sales/Lead Gen, PR/Media, Photo/Video, Finance/Accounting
-
-Return JSON array only: [{"category": "...", "count": 0, "status": "MISSING", "reason": "..."}]`
+Return ONLY a JSON array, no other text:
+[{"category": "...", "count": 0, "status": "MISSING", "reason": "..."}]`
 
   const text = await callClaude({
     model: 'claude-sonnet-4-6',
     system,
-    messages: [{ role: 'user', content: 'Analyze my network gaps.' }],
-    max_tokens: 800
+    messages: [{ role: 'user', content: `My contacts:\n${contactList || 'None yet.'}` }],
+    max_tokens: 1500
   })
   try {
     const match = text.match(/\[[\s\S]*\]/)

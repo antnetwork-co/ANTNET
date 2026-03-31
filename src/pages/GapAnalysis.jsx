@@ -11,19 +11,31 @@ const STATUS_STYLES = {
 }
 
 const ICONS = {
-  'Legal':     '⚖️', 'Attorney': '⚖️',
-  'Designer':  '🎨', 'Creative': '🎨',
-  'Investor':  '💰', 'Capital':  '💰',
-  'Developer': '💻', 'Engineer': '💻',
-  'Marketing': '📣', 'Growth':   '📣',
-  'Sales':     '📈', 'Lead Gen': '📈',
-  'PR':        '📰', 'Media':    '📰',
-  'Photo':     '📸', 'Video':    '📸',
-  'Finance':   '🧾', 'Accounting':'🧾',
+  'legal': '⚖️', 'attorney': '⚖️', 'ip': '⚖️', 'patent': '⚖️', 'contract': '⚖️',
+  'designer': '🎨', 'creative': '🎨', 'brand': '🎨', 'art': '🎨',
+  'investor': '💰', 'capital': '💰', 'vc': '💰', 'angel': '💰', 'fund': '💰', 'lender': '💰',
+  'developer': '💻', 'engineer': '💻', 'software': '💻', 'tech': '💻', 'cto': '💻',
+  'marketing': '📣', 'growth': '📣', 'seo': '📣', 'ads': '📣', 'content': '📣',
+  'sales': '📈', 'lead': '📈', 'biz dev': '📈', 'business development': '📈',
+  'pr': '📰', 'media': '📰', 'press': '📰', 'publicist': '📰',
+  'photo': '📸', 'video': '📸', 'film': '📸', 'cinemat': '📸',
+  'finance': '🧾', 'accounting': '🧾', 'cpa': '🧾', 'tax': '🧾', 'bookkeep': '🧾',
+  'mentor': '🧭', 'advisor': '🧭', 'coach': '🧭', 'consultant': '🧭',
+  'operations': '⚙️', 'ops': '⚙️', 'coo': '⚙️', 'supply': '⚙️', 'logistics': '⚙️', 'distribut': '⚙️',
+  'recruit': '🤝', 'hr': '🤝', 'hiring': '🤝', 'talent': '🤝',
+  'insurance': '🛡️', 'risk': '🛡️',
+  'real estate': '🏠', 'property': '🏠', 'escrow': '🏠', 'title': '🏠', 'broker': '🏠', 'contractor': '🏠',
+  'doctor': '🏥', 'physician': '🏥', 'medical': '🏥', 'clinical': '🏥', 'health': '🏥', 'nurse': '🏥', 'pharma': '🏥',
+  'research': '🔬', 'professor': '🔬', 'lab': '🔬', 'scientist': '🔬',
+  'academic': '🎓', 'university': '🎓', 'school': '🎓', 'tutor': '🎓', 'student': '🎓', 'alumni': '🎓',
+  'wholesale': '📦', 'manufacturer': '📦', 'sourcing': '📦',
+  'exit': '🚪', 'merger': '🚪', 'acquisition': '🚪', 'm&a': '🚪',
+  'data': '📊', 'analyst': '📊', 'market research': '📊',
 }
 
 function getIcon(category) {
-  const key = Object.keys(ICONS).find(k => category.toLowerCase().includes(k.toLowerCase()))
+  const lower = category.toLowerCase()
+  const key = Object.keys(ICONS).find(k => lower.includes(k))
   return key ? ICONS[key] : '🔗'
 }
 
@@ -178,7 +190,7 @@ export default function GapAnalysis() {
             {gaps.length === 0 ? (
               <div style={{color:'#444',textAlign:'center',padding:'40px',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px'}}>Add contacts to your network to see gap analysis.</div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'12px' }}>
                 {gaps.map((g, i) => {
                   const style = g.style || STATUS_STYLES.MISSING
                   return (

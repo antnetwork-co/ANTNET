@@ -19,6 +19,7 @@ export default function Onboarding({ userId }) {
       const { error: err } = await supabase.from('profiles').upsert({
         id: userId,
         what_i_do: whatIDo.trim(),
+        plan: 'free',
         updated_at: new Date().toISOString()
       })
       if (err) { setError('Save error: ' + err.message); setLoading(false); return }
