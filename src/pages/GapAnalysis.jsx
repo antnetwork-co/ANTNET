@@ -55,29 +55,25 @@ export default function GapAnalysis() {
     setFromCache(false)
     try {
       // Fetch contacts — this is the critical query, fail fast if it errors
-      const { data: contacts } = await supabase.from('network_contacts').select('name, occupation, skills_services')
+      // Fetch contacts and cache check in parallel
+      const [{ data: contacts }, { data: profileData }] = await Promise.all([
+        supabase.from('network_contacts').select('name, occupation, skills_services'),
+        !forceRefresh
+          ? supabase.from('profiles').select('ai_gaps, ai_gaps_contacts_count, ai_gaps_what_i_do').eq('id', userId).single()
+          : Promise.resolve({ data: null })
+      ])
       const contactList = contacts || []
-      setLoading(false)
 
-      // Check cache separately — best-effort, don't let it block or crash
-      if (!forceRefresh) {
-        try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('ai_gaps, ai_gaps_contacts_count, ai_gaps_what_i_do')
-            .eq('id', userId)
-            .single()
-          if (
-            profileData?.ai_gaps &&
-            profileData.ai_gaps_contacts_count === contactList.length &&
-            profileData.ai_gaps_what_i_do === profile?.what_i_do &&
-            contactList.length > 0
-          ) {
-            setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
-            setFromCache(true)
-            return
-          }
-        } catch {}
+      // Serve from cache if valid — no blank flash
+      if (
+        profileData?.ai_gaps &&
+        profileData.ai_gaps_contacts_count === contactList.length &&
+        profileData.ai_gaps_what_i_do === profile?.what_i_do &&
+        contactList.length > 0
+      ) {
+        setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
+        setFromCache(true)
+        return
       }
 
       if (!profile?.what_i_do || contactList.length === 0) {
@@ -149,7 +145,7 @@ export default function GapAnalysis() {
               {fromCache && <span style={{ color:'#444', marginLeft:'8px' }}>(cached)</span>}
             </div>
           )}
-          {!loading && !aiLoading && (
+          {!loading && !aiLoading && gaps.length > 0 && (
             <button className="btn btn-ghost" style={{ fontSize:'11px', padding:'4px 10px' }} onClick={() => fetchAndAnalyze(true)}>
               ↺ Refresh
             </button>
@@ -158,19 +154,19 @@ export default function GapAnalysis() {
       </div>
 
       <div style={{ padding:'24px 28px', flex:1 }}>
-        {loading ? (
-          <div style={{color:'#666',textAlign:'center',padding:'40px',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px'}}>Loading your network...</div>
+        {loading || aiLoading ? (
+          <div style={{textAlign:'center',padding:'40px'}}>
+            <div style={{color: aiLoading ? '#4a9eff' : '#666', fontFamily:"'JetBrains Mono',monospace",fontSize:'12px',marginBottom:'8px'}}>
+              {aiLoading ? '◆ AI analyzing your network gaps...' : 'Loading your network...'}
+            </div>
+            {aiLoading && <div style={{color:'#444',fontSize:'11px',fontFamily:"'JetBrains Mono',monospace"}}>Personalizing based on "{profile?.what_i_do}"</div>}
+          </div>
         ) : error ? (
           <div className="empty-state">
             <div className="empty-state-icon">⚡</div>
             <div className="empty-state-title">Connection timed out</div>
             <div className="empty-state-sub">Supabase took too long to respond</div>
             <button className="btn btn-gold" onClick={fetchAndAnalyze}>↺ Retry</button>
-          </div>
-        ) : aiLoading ? (
-          <div style={{textAlign:'center',padding:'40px'}}>
-            <div style={{color:'#4a9eff',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px',marginBottom:'8px'}}>◆ AI analyzing your network gaps...</div>
-            <div style={{color:'#444',fontSize:'11px',fontFamily:"'JetBrains Mono',monospace"}}>Personalizing based on "{profile?.what_i_do}"</div>
           </div>
         ) : (
           <>
