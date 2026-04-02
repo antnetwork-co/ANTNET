@@ -190,7 +190,7 @@ export default function GapAnalysis() {
             {gaps.length === 0 ? (
               <div style={{color:'#444',textAlign:'center',padding:'40px',fontFamily:"'JetBrains Mono',monospace",fontSize:'12px'}}>Add contacts to your network to see gap analysis.</div>
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:'12px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px' }}>
                 {gaps.map((g, i) => {
                   const style = g.style || STATUS_STYLES.MISSING
                   return (
