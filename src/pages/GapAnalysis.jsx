@@ -64,12 +64,13 @@ export default function GapAnalysis() {
         try {
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('ai_gaps, ai_gaps_contacts_count')
+            .select('ai_gaps, ai_gaps_contacts_count, ai_gaps_what_i_do')
             .eq('id', userId)
             .single()
           if (
             profileData?.ai_gaps &&
             profileData.ai_gaps_contacts_count === contactList.length &&
+            profileData.ai_gaps_what_i_do === profile?.what_i_do &&
             contactList.length > 0
           ) {
             setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
@@ -93,7 +94,8 @@ export default function GapAnalysis() {
         // Save cache in background — don't await
         supabase.from('profiles').update({
           ai_gaps: aiGaps,
-          ai_gaps_contacts_count: contactList.length
+          ai_gaps_contacts_count: contactList.length,
+          ai_gaps_what_i_do: profile?.what_i_do
         }).eq('id', userId).then(() => {}).catch(() => {})
       } else {
         setGaps(basicAnalysis(contactList))
