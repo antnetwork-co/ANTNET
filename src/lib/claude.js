@@ -118,15 +118,16 @@ Your job:
    - 1 contact = WEAK
    - 2-3 contacts = GROWING
    - 4+ contacts = STRONG
-3. For each category, write 2-3 sentences that:
-   - If they have contacts: name them and briefly describe how they cover (or only partially cover) this category
-   - If they're missing contacts: explain specifically what's absent and why it matters for their goals
-   - Be specific to their background — not generic advice
+3. For each category, write the reason text based on status:
+   - MISSING: 1-2 sentences on why this type of person matters specifically for their background and goals. No names.
+   - WEAK: Name the contact(s) they have, what those people bring, and what's still lacking in that category.
+   - GROWING/STRONG: Name the contacts and briefly note what each brings to this category. No filler about why they need it.
 
-Examples of good reason text:
-- "Only Kevin Callagy (Wealth Management) loosely qualifies. No active angel investors or VCs who can write checks or open doors to capital — critical gap for scaling."
-- "Dillon Abend (App Dev) and Hatem Elmougy (Coding/AI) cover this well. A senior full-stack or product engineer would round it out."
-- "No lawyers or legal advisors in your network. As an entrepreneur you'll need contract review, business formation, and IP protection — this is an urgent gap."
+Examples of good reason text by status:
+   - MISSING: "No legal coverage at all. As an entrepreneur you'll hit contract, IP, and formation issues — this is an urgent gap."
+   - WEAK: "Only Kevin Callagy (Wealth Management) loosely qualifies here. No active angel investors or VCs who can write checks."
+   - GROWING: "Dillon Abend (App Dev), Hatem Elmougy (Coding/AI), and Jake Amaral (Computer Science) cover this space."
+   - STRONG: "Victor Gilloteau, Harrison Brent, Brody Kupczyk, and AJ Bern all work in marketing, social media, and e-commerce."
 
 Examples of how to tailor categories:
 - Entrepreneur → Patent / IP Attorney, Business Mentor / Advisor, Angel Investor, Distributor / Supply Chain, PR Strategist, CPA / Tax Strategist, Brand Designer, Growth Marketer, Sales Lead Gen, Developer / Engineer, Operations / COO type, Exit / M&A Advisor, Recruiter / HR, Insurance Broker, Commercial Real Estate
