@@ -54,26 +54,29 @@ export default function GapAnalysis() {
     setError(false)
     setFromCache(false)
     try {
-      // Fetch contacts — this is the critical query, fail fast if it errors
-      // Fetch contacts and cache check in parallel
-      const [{ data: contacts }, { data: profileData }] = await Promise.all([
-        supabase.from('network_contacts').select('name, occupation, skills_services'),
-        !forceRefresh
-          ? supabase.from('profiles').select('ai_gaps, ai_gaps_contacts_count, ai_gaps_what_i_do').eq('id', userId).single()
-          : Promise.resolve({ data: null })
-      ])
+      // Fetch contacts first — required
+      const { data: contacts } = await supabase.from('network_contacts').select('name, occupation, skills_services')
       const contactList = contacts || []
 
-      // Serve from cache if valid — no blank flash
-      if (
-        profileData?.ai_gaps &&
-        profileData.ai_gaps_contacts_count === contactList.length &&
-        profileData.ai_gaps_what_i_do === profile?.what_i_do &&
-        contactList.length > 0
-      ) {
-        setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
-        setFromCache(true)
-        return
+      // Cache check — best-effort, don't let failure block
+      if (!forceRefresh) {
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('ai_gaps, ai_gaps_contacts_count, ai_gaps_what_i_do')
+            .eq('id', userId)
+            .single()
+          if (
+            profileData?.ai_gaps &&
+            profileData.ai_gaps_contacts_count === contactList.length &&
+            profileData.ai_gaps_what_i_do === profile?.what_i_do &&
+            contactList.length > 0
+          ) {
+            setGaps(profileData.ai_gaps.map(g => ({ ...g, style: STATUS_STYLES[g.status] || STATUS_STYLES.MISSING })))
+            setFromCache(true)
+            return
+          }
+        } catch {}
       }
 
       if (!profile?.what_i_do || contactList.length === 0) {
