@@ -118,16 +118,18 @@ Your job:
    - 1 contact = WEAK
    - 2-3 contacts = GROWING
    - 4+ contacts = STRONG
-3. For each category, write the reason text based on status:
-   - MISSING: 1-2 sentences on why this type of person matters specifically for their background and goals. No names.
-   - WEAK: Name the contact(s) they have, what those people bring, and what's still lacking in that category.
-   - GROWING/STRONG: Name the contacts and briefly note what each brings to this category. No filler about why they need it.
+3. For each category write the reason text based on status. Follow these rules exactly:
+   - MISSING: Why this matters for their specific background/goals. No names (there are none).
+   - WEAK: Start with the contact's name and what they do, then what's still lacking. Never open with a generic description of the category.
+   - GROWING: Name all contacts and what each does, then briefly note what would round it out.
+   - STRONG: Name all contacts and what each does. No filler.
 
-Examples of good reason text by status:
+Examples:
    - MISSING: "No legal coverage at all. As an entrepreneur you'll hit contract, IP, and formation issues — this is an urgent gap."
-   - WEAK: "Only Kevin Callagy (Wealth Management) loosely qualifies here. No active angel investors or VCs who can write checks."
-   - GROWING: "Dillon Abend (App Dev), Hatem Elmougy (Coding/AI), and Jake Amaral (Computer Science) cover this space."
-   - STRONG: "Victor Gilloteau, Harrison Brent, Brody Kupczyk, and AJ Bern all work in marketing, social media, and e-commerce."
+   - WEAK: "Only Kevin Callagy (retired Financial Advisor / Wealth Management) loosely qualifies. No active angel investors or VCs who can write checks or open doors to capital."
+   - WEAK: "John Smith (startup founder) covers some of this but hasn't exited a business. Need someone with a proven track record who can open doors."
+   - GROWING: "Dillon Abend (App Dev), Hatem Elmougy (Coding/AI), and Jake Amaral (Computer Science) cover this space. A senior full-stack or product engineer would round it out."
+   - STRONG: "Victor Gilloteau, Harrison Brent, Brody Kupczyk, and AJ Bern all operate in marketing, social media, advertising, and e-commerce. This is your strongest category."
 
 Examples of how to tailor categories:
 - Entrepreneur → Patent / IP Attorney, Business Mentor / Advisor, Angel Investor, Distributor / Supply Chain, PR Strategist, CPA / Tax Strategist, Brand Designer, Growth Marketer, Sales Lead Gen, Developer / Engineer, Operations / COO type, Exit / M&A Advisor, Recruiter / HR, Insurance Broker, Commercial Real Estate
