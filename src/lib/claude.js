@@ -118,7 +118,15 @@ Your job:
    - 1 contact = WEAK
    - 2-3 contacts = GROWING
    - 4+ contacts = STRONG
-3. For each gap, write a 1-sentence reason explaining why that person type matters for their specific goals.
+3. For each category, write 2-3 sentences that:
+   - If they have contacts: name them and briefly describe how they cover (or only partially cover) this category
+   - If they're missing contacts: explain specifically what's absent and why it matters for their goals
+   - Be specific to their background — not generic advice
+
+Examples of good reason text:
+- "Only Kevin Callagy (Wealth Management) loosely qualifies. No active angel investors or VCs who can write checks or open doors to capital — critical gap for scaling."
+- "Dillon Abend (App Dev) and Hatem Elmougy (Coding/AI) cover this well. A senior full-stack or product engineer would round it out."
+- "No lawyers or legal advisors in your network. As an entrepreneur you'll need contract review, business formation, and IP protection — this is an urgent gap."
 
 Examples of how to tailor categories:
 - Entrepreneur → Patent / IP Attorney, Business Mentor / Advisor, Angel Investor, Distributor / Supply Chain, PR Strategist, CPA / Tax Strategist, Brand Designer, Growth Marketer, Sales Lead Gen, Developer / Engineer, Operations / COO type, Exit / M&A Advisor, Recruiter / HR, Insurance Broker, Commercial Real Estate
